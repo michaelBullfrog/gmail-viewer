@@ -1,0 +1,56 @@
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Gmail Viewer</title>
+  <script src="https://apis.google.com/js/api.js"></script>
+  <style>
+    body { font-family: Arial, sans-serif; margin: 40px; }
+    #emails { list-style: none; padding: 0; }
+    #emails li { background: #f2f2f2; margin-bottom: 10px; padding: 10px; border-radius: 5px; }
+  </style>
+</head>
+<body>
+  <h1>My Gmail Inbox</h1>
+  <ul id="emails"></ul>
+
+  <script>
+    function start() {
+      gapi.client.init({
+        apiKey: 'YOUR_API_KEY',
+        clientId: 'YOUR_CLIENT_ID',
+        discoveryDocs: ["https://www.googleapis.com/discovery/v1/apis/gmail/v1/rest"],
+        scope: "https://www.googleapis.com/auth/gmail.readonly"
+      }).then(() => {
+        return gapi.auth2.getAuthInstance().signIn();
+      }).then(() => {
+        loadInbox();
+      });
+    }
+
+    function loadInbox() {
+      gapi.client.gmail.users.messages.list({
+        userId: 'me',
+        maxResults: 10
+      }).then(response => {
+        const messages = response.result.messages;
+        messages.forEach(msg => {
+          gapi.client.gmail.users.messages.get({
+            userId: 'me',
+            id: msg.id
+          }).then(fullMsg => {
+            const snippet = fullMsg.result.snippet;
+            const list = document.getElementById('emails');
+            const item = document.createElement('li');
+            item.textContent = snippet;
+            list.appendChild(item);
+          });
+        });
+      });
+    }
+
+    gapi.load('client:auth2', start);
+  </script>
+</body>
+</html>
