@@ -1,10 +1,9 @@
-
 <!DOCTYPE html>
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <title>Gmail Viewer</title>
-  <script src="https://apis.google.com/js/api.js"></script>
+  <title>Gmail Viewer with Google Identity Services</title>
+  <script src="https://accounts.google.com/gsi/client" async defer></script>
   <style>
     body { font-family: Arial, sans-serif; margin: 40px; }
     #emails { list-style: none; padding: 0; }
@@ -13,44 +12,39 @@
 </head>
 <body>
   <h1>My Gmail Inbox</h1>
+
+  <!-- Google Sign-in Button -->
+  <div id="g_id_onload"
+       data-client_id="474892923870-2r0ksjol93ve88881n7p2glmv7onpd4l.apps.googleusercontent.com"
+       data-context="signin"
+       data-ux_mode="popup"
+       data-callback="handleCredentialResponse"
+       data-auto_prompt="false">
+  </div>
+
+  <div class="g_id_signin"
+       data-type="standard"
+       data-shape="rectangular"
+       data-theme="outline"
+       data-text="signin_with"
+       data-size="large"
+       data-logo_alignment="left">
+  </div>
+
   <ul id="emails"></ul>
 
   <script>
-    function start() {
-      gapi.client.init({
-        apiKey: '',
-        clientId: '474892923870-2r0ksjol93ve88881n7p2glmv7onpd4l.apps.googleusercontent.com',
-        discoveryDocs: ["https://www.googleapis.com/discovery/v1/apis/gmail/v1/rest"],
-        scope: "https://www.googleapis.com/auth/gmail.readonly"
-      }).then(() => {
-        return gapi.auth2.getAuthInstance().signIn();
-      }).then(() => {
-        loadInbox();
-      });
-    }
+    function handleCredentialResponse(response) {
+      const token = response.credential;
+      console.log("Encoded JWT ID token:", token);
+      // TODO: Send this token to your server or decode it to get user info
 
-    function loadInbox() {
-      gapi.client.gmail.users.messages.list({
-        userId: 'me',
-        maxResults: 10
-      }).then(response => {
-        const messages = response.result.messages;
-        messages.forEach(msg => {
-          gapi.client.gmail.users.messages.get({
-            userId: 'me',
-            id: msg.id
-          }).then(fullMsg => {
-            const snippet = fullMsg.result.snippet;
-            const list = document.getElementById('emails');
-            const item = document.createElement('li');
-            item.textContent = snippet;
-            list.appendChild(item);
-          });
-        });
-      });
+      // Example: Decode the JWT for demo purposes only
+      const base64Url = token.split('.')[1];
+      const base64 = base64Url.replace(/-/g, '+').replace(/_/g, '/');
+      const decodedData = JSON.parse(atob(base64));
+      document.body.insertAdjacentHTML('beforeend', `<p>Welcome, ${decodedData.name}</p>`);
     }
-
-    gapi.load('client:auth2', start);
   </script>
 </body>
 </html>
