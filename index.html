@@ -11,30 +11,22 @@
       background-color: #f4f7fa;
       color: #333;
     }
-
-    h1 {
-      text-align: center;
-      margin-bottom: 10px;
-    }
-
+    h1 { text-align: center; margin-bottom: 10px; }
     #filterSection {
       text-align: center;
       margin-bottom: 30px;
     }
-
     #filterSection select, #searchInput, #searchButton {
       padding: 8px;
       font-size: 1em;
       margin: 0 5px;
     }
-
     #emails {
       list-style: none;
       padding: 0;
       max-width: 800px;
       margin: 0 auto;
     }
-
     #emails li {
       background: #fff;
       margin-bottom: 20px;
@@ -43,19 +35,16 @@
       box-shadow: 0 2px 6px rgba(0, 0, 0, 0.1);
       cursor: pointer;
     }
-
     .subject {
       font-weight: 600;
       font-size: 1.1em;
       color: #004d99;
     }
-
     .meta {
       font-size: 0.9em;
       color: #777;
       margin-bottom: 10px;
     }
-
     .email-body {
       display: none;
       margin-top: 10px;
@@ -64,12 +53,10 @@
       border-radius: 5px;
       white-space: pre-wrap;
     }
-
     .reply-box {
       margin-top: 10px;
       display: none;
     }
-
     .reply-box textarea {
       width: 100%;
       height: 80px;
@@ -79,7 +66,6 @@
       resize: vertical;
       font-size: 0.95em;
     }
-
     .reply-box button {
       margin-top: 10px;
       padding: 8px 16px;
@@ -90,11 +76,7 @@
       cursor: pointer;
       font-size: 0.95em;
     }
-
-    .reply-box button:hover {
-      background-color: #005bb5;
-    }
-
+    .reply-box button:hover { background-color: #005bb5; }
     #backToTop {
       position: fixed;
       bottom: 20px;
@@ -111,15 +93,36 @@
 </head>
 <body>
   <h1>My Gmail Inbox</h1>
+
+  <!-- ✅ Sign-In Buttons -->
+  <div id="g_id_onload"
+       data-client_id="474892923870-2r0ksjol93ve88881n7p2glmv7onpd4l.apps.googleusercontent.com"
+       data-context="use"
+       data-ux_mode="popup"
+       data-callback="handleCredentialResponse"
+       data-auto_prompt="false"
+       data-scope="https://www.googleapis.com/auth/gmail.modify">
+  </div>
+
+  <div class="g_id_signin"
+       data-type="standard"
+       data-shape="rectangular"
+       data-theme="outline"
+       data-text="signin_with"
+       data-size="large"
+       data-logo_alignment="left">
+  </div>
+
+  <!-- ✅ Filters + Search -->
   <div id="filterSection">
-    <label for="timeFilter">Time: </label>
+    <label for="timeFilter">Time:</label>
     <select id="timeFilter" onchange="refreshInbox()">
       <option value="24h">Last 24 Hours</option>
       <option value="7d">Last 7 Days</option>
       <option value="all" selected>All</option>
     </select>
 
-    <label for="labelFilter">Label: </label>
+    <label for="labelFilter">Label:</label>
     <select id="labelFilter" onchange="refreshInbox()">
       <option value="">All</option>
       <option value="label:inbox">Inbox</option>
@@ -155,8 +158,12 @@
 
     function handleCredentialResponse(response) {
       const decoded = JSON.parse(atob(response.credential.split('.')[1]));
-      document.body.insertAdjacentHTML('afterbegin', `<p style='text-align:center;'>Welcome, ${decoded.name}</p>`);
+      document.body.insertAdjacentHTML('afterbegin', `<p style="text-align:center;">Welcome, ${decoded.name}</p>`);
       tokenClient.requestAccessToken();
+    }
+
+    function formatDate(date) {
+      return date.toISOString().split('T')[0].replace(/-/g, '/');
     }
 
     function getTimeQuery() {
@@ -177,10 +184,6 @@
       if (searchTerm) qParts.push(searchTerm);
 
       return qParts.join(' ');
-    }
-
-    function formatDate(date) {
-      return date.toISOString().split('T')[0].replace(/-/g, '/');
     }
 
     function refreshInbox() {
@@ -214,8 +217,8 @@
           }
 
           nextPageToken = data.nextPageToken || '';
-
           const list = document.getElementById('emails');
+
           data.messages.forEach(msg => {
             fetch(`https://gmail.googleapis.com/gmail/v1/users/me/messages/${msg.id}`, {
               headers: { 'Authorization': `Bearer ${access_token}` }
@@ -256,17 +259,8 @@
       const messageBody = textarea.value.trim();
       if (!messageBody) return alert('Please write a reply.');
 
-      const raw = [
-        `To: ${to}`,
-        `Subject: Re: ${subject}`,
-        '',
-        messageBody
-      ].join('\n');
-
-      const base64EncodedEmail = btoa(raw)
-        .replace(/\+/g, '-')
-        .replace(/\//g, '_')
-        .replace(/=+$/, '');
+      const raw = [`To: ${to}`, `Subject: Re: ${subject}`, '', messageBody].join('\n');
+      const base64EncodedEmail = btoa(raw).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
 
       fetch('https://gmail.googleapis.com/gmail/v1/users/me/messages/send', {
         method: 'POST',
@@ -277,7 +271,7 @@
         body: JSON.stringify({ raw: base64EncodedEmail })
       })
         .then(res => res.json())
-        .then(data => {
+        .then(() => {
           alert('Reply sent!');
           textarea.value = '';
         })
@@ -302,7 +296,7 @@
           if (window.google && google.accounts) {
             initializeTokenClient();
           } else {
-            console.error("Google Identity Services SDK failed to load.");
+            console.error('Google Identity Services SDK failed to load.');
           }
         }, 1000);
       }
