@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <title>Gmail Viewer – Sorted & Synced</title>
+  <title>Gmail Viewer – Folder Support</title>
   <script src="https://accounts.google.com/gsi/client" async defer></script>
   <style>
     body { font-family: Arial, sans-serif; margin: 40px; background-color: #f4f7fa; color: #333; }
@@ -104,6 +104,7 @@
 <script>
   let access_token = '';
   let tokenClient;
+  let labelList = [];
   let nextPageToken = '';
   let loading = false;
 
@@ -117,8 +118,9 @@
       scope: 'https://www.googleapis.com/auth/gmail.modify',
       callback: (response) => {
         access_token = response.access_token;
+        loadLabels(); // Load label list
         refreshInbox();
-        setInterval(refreshInbox, 120000); // Refresh every 2 minutes
+        setInterval(refreshInbox, 120000);
       },
     });
   }
@@ -140,6 +142,16 @@
       }, 1000);
     }
   };
+
+  function loadLabels() {
+    fetch('https://gmail.googleapis.com/gmail/v1/users/me/labels', {
+      headers: { 'Authorization': `Bearer ${access_token}` }
+    })
+    .then(res => res.json())
+    .then(data => {
+      labelList = data.labels.filter(l => l.type === 'user'); // Only user-created labels
+    });
+  }
 
   function getTimeQuery() {
     const timeFilter = document.getElementById('timeFilter').value;
@@ -216,11 +228,23 @@
                 </div>`;
             });
 
+            const labelDropdown = labelList.map(label =>
+              `<option value="${label.id}">${label.name}</option>`).join('');
+
             item.innerHTML = `
               <div class="subject${isUnread ? '' : ' read'}" onclick="toggleThread(this)">
                 ${subject}${newBadge}
                 <span style="float:right; font-size:0.85em; color:#666;">${newestDate}</span>
               </div>
+
+              <div style="margin-top: 10px;">
+                <label>Move to Folder:</label>
+                <select onchange="labelThread(this, '${fullThread.id}')">
+                  <option value="">Select folder</option>
+                  ${labelDropdown}
+                </select>
+              </div>
+
               <div class="thread-container">
                 ${threadHtml}
               </div>`;
@@ -232,16 +256,16 @@
 </script>
 <script>
   function toggleThread(subjectDiv) {
-    const container = subjectDiv.nextElementSibling;
-    const isHidden = container.style.display === 'none';
-    container.style.display = isHidden ? 'block' : 'none';
+    const container = subjectDiv.nextElementSibling?.nextElementSibling; // Skip dropdown
+    const isHidden = container?.style.display === 'none';
+    if (container) {
+      container.style.display = isHidden ? 'block' : 'none';
+    }
 
-    // Visually mark as read
     subjectDiv.classList.add('read');
     const badge = subjectDiv.querySelector('.new-badge');
     if (badge) badge.remove();
 
-    // Update Gmail to remove UNREAD label so it stays read after refresh
     const threadId = subjectDiv.closest('li')?.dataset.threadId;
     if (threadId) {
       fetch(`https://gmail.googleapis.com/gmail/v1/users/me/threads/${threadId}/modify`, {
@@ -253,6 +277,27 @@
         body: JSON.stringify({ removeLabelIds: ['UNREAD'] })
       });
     }
+  }
+
+  function labelThread(selectElem, threadId) {
+    const labelId = selectElem.value;
+    if (!labelId) return;
+
+    fetch(`https://gmail.googleapis.com/gmail/v1/users/me/threads/${threadId}/modify`, {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${access_token}`,
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({
+        addLabelIds: [labelId],
+        removeLabelIds: ['INBOX']
+      })
+    })
+    .then(() => {
+      alert("Thread moved to folder.");
+      refreshInbox();
+    });
   }
 
   window.onscroll = function () {
