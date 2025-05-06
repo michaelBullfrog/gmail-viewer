@@ -2,10 +2,10 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <title>Gmail Viewer – Threads & Timestamps</title>
+  <title>Gmail Viewer – Sorted & Synced</title>
   <script src="https://accounts.google.com/gsi/client" async defer></script>
   <style>
-    body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; margin: 40px; background-color: #f4f7fa; color: #333; }
+    body { font-family: Arial, sans-serif; margin: 40px; background-color: #f4f7fa; color: #333; }
     h1 { text-align: center; margin-bottom: 10px; }
     #filterSection { text-align: center; margin-bottom: 30px; }
     #filterSection select, #searchInput, #searchButton {
@@ -44,14 +44,13 @@
     .reply-box button {
       margin-top: 10px; padding: 8px 16px; border: none;
       border-radius: 5px; background-color: #0073e6; color: white;
-      cursor: pointer; font-size: 0.95em; font-weight: 600; text-align: center;
+      cursor: pointer; font-size: 0.95em; font-weight: 600;
     }
     .reply-box button:hover { background-color: #005bb5; }
     #backToTop {
       position: fixed; bottom: 20px; right: 20px; display: none;
       background-color: #0073e6; color: white; border: none;
       padding: 10px 20px; border-radius: 5px; cursor: pointer;
-      font-weight: 600; text-align: center;
     }
     .new-badge {
       color: red; font-size: 0.9em; font-weight: bold; margin-left: 10px;
@@ -61,9 +60,9 @@
 <body>
   <h1>My Gmail Inbox</h1>
 
-  <!-- Sign-In -->
+  <!-- Google Sign-In -->
   <div id="g_id_onload"
-       data-client_id="474892923870-2r0ksjol93ve88881n7p2glmv7onpd4l.apps.googleusercontent.com"
+       data-client_id="YOUR_CLIENT_ID"
        data-context="use"
        data-ux_mode="popup"
        data-callback="handleCredentialResponse"
@@ -99,19 +98,36 @@
     <input type="text" id="searchInput" placeholder="Search keywords...">
     <button id="searchButton" onclick="refreshInbox()">Search</button>
   </div>
-  <!-- Email List -->
-  <ul id="emails"></ul>
 
-  <!-- Back to Top Button -->
-  <button id="backToTop" onclick="window.scrollTo({top: 0, behavior: 'smooth'})">
-    Back to Top
-  </button>
+  <ul id="emails"></ul>
+  <button id="backToTop" onclick="window.scrollTo({top: 0, behavior: 'smooth'})">Back to Top</button>
 <script>
   let access_token = '';
   let tokenClient;
   let nextPageToken = '';
-  let lastMessageId = null;
   let loading = false;
+
+  function formatDate(date) {
+    return date.toLocaleString();
+  }
+
+  function initializeTokenClient() {
+    tokenClient = google.accounts.oauth2.initTokenClient({
+      client_id: 'YOUR_CLIENT_ID',
+      scope: 'https://www.googleapis.com/auth/gmail.modify',
+      callback: (response) => {
+        access_token = response.access_token;
+        refreshInbox();
+        setInterval(refreshInbox, 120000); // Refresh every 2 minutes
+      },
+    });
+  }
+
+  function handleCredentialResponse(response) {
+    const decoded = JSON.parse(atob(response.credential.split('.')[1]));
+    document.body.insertAdjacentHTML('afterbegin', `<p style='text-align:center;'>Welcome, ${decoded.name}</p>`);
+    tokenClient?.requestAccessToken();
+  }
 
   window.onload = function () {
     if (window.google && google.accounts) {
@@ -124,31 +140,6 @@
       }, 1000);
     }
   };
-
-  function initializeTokenClient() {
-    tokenClient = google.accounts.oauth2.initTokenClient({
-      client_id: '474892923870-2r0ksjol93ve88881n7p2glmv7onpd4l.apps.googleusercontent.com',
-      scope: 'https://www.googleapis.com/auth/gmail.modify',
-      callback: (response) => {
-        access_token = response.access_token;
-        refreshInbox();
-        setInterval(refreshInbox, 120000); // Refresh every 120 seconds
-      },
-    });
-  }
-
-  function handleCredentialResponse(response) {
-    const decoded = JSON.parse(atob(response.credential.split('.')[1]));
-    document.body.insertAdjacentHTML('afterbegin', `<p style='text-align:center;'>Welcome, ${decoded.name}</p>`);
-    tokenClient?.requestAccessToken();
-  }
-
-  function formatDate(date) {
-    return date.toLocaleString(undefined, {
-      year: 'numeric', month: 'short', day: 'numeric',
-      hour: '2-digit', minute: '2-digit'
-    });
-  }
 
   function getTimeQuery() {
     const timeFilter = document.getElementById('timeFilter').value;
@@ -168,41 +159,44 @@
     document.getElementById('emails').innerHTML = '';
     loadInbox();
   }
-function loadInbox() {
-  if (loading) return;
-  loading = true;
-  const item = document.createElement('li');
-item.setAttribute('data-thread-id', fullThread.id); // <-- Add this line
 
+  function loadInbox() {
+    if (loading) return;
+    loading = true;
 
-  const query = getTimeQuery();
-  const url = new URL('https://gmail.googleapis.com/gmail/v1/users/me/threads');
-  url.searchParams.set('maxResults', '10');
-  if (query) url.searchParams.set('q', query);
-  if (nextPageToken) url.searchParams.set('pageToken', nextPageToken);
+    const query = getTimeQuery();
+    const url = new URL('https://gmail.googleapis.com/gmail/v1/users/me/threads');
+    url.searchParams.set('maxResults', '10');
+    if (query) url.searchParams.set('q', query);
+    if (nextPageToken) url.searchParams.set('pageToken', nextPageToken);
 
-  fetch(url, { headers: { 'Authorization': `Bearer ${access_token}` } })
-    .then(res => res.json())
-    .then(data => {
-      loading = false;
-      if (!data.threads) return;
+    fetch(url, { headers: { 'Authorization': `Bearer ${access_token}` } })
+      .then(res => res.json())
+      .then(data => {
+        loading = false;
+        if (!data.threads) return;
+        nextPageToken = data.nextPageToken || '';
+        const list = document.getElementById('emails');
 
-      nextPageToken = data.nextPageToken || '';
-      const list = document.getElementById('emails');
+        Promise.all(
+          data.threads.map(t =>
+            fetch(`https://gmail.googleapis.com/gmail/v1/users/me/threads/${t.id}`, {
+              headers: { 'Authorization': `Bearer ${access_token}` }
+            }).then(res => res.json())
+          )
+        ).then(fullThreads => {
+          const sorted = fullThreads.sort((a, b) => {
+            const bDate = parseInt(b.messages[b.messages.length - 1].internalDate);
+            const aDate = parseInt(a.messages[a.messages.length - 1].internalDate);
+            return bDate - aDate;
+          });
 
-      // Sort threads by historyId (larger = more recent)
-      const sortedThreads = data.threads.sort((a, b) => parseInt(b.historyId) - parseInt(a.historyId));
-
-      sortedThreads.forEach(thread => {
-        fetch(`https://gmail.googleapis.com/gmail/v1/users/me/threads/${thread.id}`, {
-          headers: { 'Authorization': `Bearer ${access_token}` }
-        })
-          .then(res => res.json())
-          .then(fullThread => {
+          sorted.forEach(fullThread => {
             const item = document.createElement('li');
-            const messages = fullThread.messages;
-            const sortedMessages = messages.sort((a, b) => parseInt(b.internalDate) - parseInt(a.internalDate));
-            const newestMsg = sortedMessages[0];
+            item.setAttribute('data-thread-id', fullThread.id);
+
+            const messages = fullThread.messages.sort((a, b) => parseInt(b.internalDate) - parseInt(a.internalDate));
+            const newestMsg = messages[0];
             const subject = newestMsg.payload.headers.find(h => h.name === 'Subject')?.value || '(No Subject)';
             const newestDate = formatDate(new Date(parseInt(newestMsg.internalDate)));
             const first = messages[0];
@@ -210,7 +204,7 @@ item.setAttribute('data-thread-id', fullThread.id); // <-- Add this line
             const newBadge = isUnread ? `<span class="new-badge">NEW</span>` : '';
 
             let threadHtml = '';
-            sortedMessages.forEach(m => {
+            messages.forEach(m => {
               const from = m.payload.headers.find(h => h.name === 'From')?.value || '(Unknown)';
               const date = formatDate(new Date(parseInt(m.internalDate)));
               const part = m.payload.parts?.find(p => p.mimeType === 'text/plain') || m.payload;
@@ -229,111 +223,34 @@ item.setAttribute('data-thread-id', fullThread.id); // <-- Add this line
               </div>
               <div class="thread-container">
                 ${threadHtml}
-                <div class="reply-box">
-                  <input type="text" class="cc" placeholder="CC (optional)">
-                  <input type="text" class="bcc" placeholder="BCC (optional)">
-                  <input type="file" class="attachment">
-                  <textarea class="body" placeholder="Reply..."></textarea>
-                  <button onclick="sendReply('${first.payload.headers.find(h => h.name === 'From')?.value}', '${subject}', this)">
-                    Send Reply
-                  </button>
-                </div>
               </div>`;
             list.appendChild(item);
           });
+        });
       });
-    });
-}
-
+  }
+</script>
+<script>
   function toggleThread(subjectDiv) {
-  const container = subjectDiv.nextElementSibling;
-  const isHidden = container.style.display === 'none';
-  container.style.display = isHidden ? 'block' : 'none';
+    const container = subjectDiv.nextElementSibling;
+    const isHidden = container.style.display === 'none';
+    container.style.display = isHidden ? 'block' : 'none';
 
-  // Mark as visually read
-  subjectDiv.classList.add('read');
-  const badge = subjectDiv.querySelector('.new-badge');
-  if (badge) badge.remove();
+    // Visually mark as read
+    subjectDiv.classList.add('read');
+    const badge = subjectDiv.querySelector('.new-badge');
+    if (badge) badge.remove();
 
-  // Mark as read in Gmail so it doesn't come back after refresh
-  const threadId = subjectDiv.closest('li').dataset.threadId;
-  fetch(`https://gmail.googleapis.com/gmail/v1/users/me/threads/${threadId}/modify`, {
-    method: 'POST',
-    headers: {
-      'Authorization': `Bearer ${access_token}`,
-      'Content-Type': 'application/json'
-    },
-    body: JSON.stringify({
-      removeLabelIds: ['UNREAD']
-    })
-  });
-}
-  function sendReply(to, subject, button) {
-    const box = button.closest('.reply-box');
-    const cc = box.querySelector('.cc').value.trim();
-    const bcc = box.querySelector('.bcc').value.trim();
-    const body = box.querySelector('.body').value.trim();
-    const fileInput = box.querySelector('.attachment');
-    const file = fileInput.files[0];
-
-    if (!body && !file) return alert('Reply must include a message or attachment.');
-
-    const headers = [
-      `To: ${to}`,
-      `Subject: Re: ${subject}`,
-      cc ? `Cc: ${cc}` : '',
-      bcc ? `Bcc: ${bcc}` : '',
-      'MIME-Version: 1.0',
-      file ? 'Content-Type: multipart/mixed; boundary="boundary"' : 'Content-Type: text/plain; charset=UTF-8'
-    ].filter(Boolean).join('\r\n');
-
-    let mimeBody = '';
-
-    if (file) {
-      const reader = new FileReader();
-      reader.onload = function () {
-        const fileData = reader.result.split(',')[1];
-        mimeBody = `--boundary
-Content-Type: text/plain; charset="UTF-8"
-
-${body}
-
---boundary
-Content-Type: ${file.type}; name="${file.name}"
-Content-Disposition: attachment; filename="${file.name}"
-Content-Transfer-Encoding: base64
-
-${fileData}
---boundary--`;
-
-        const fullRaw = btoa(headers + '\r\n\r\n' + mimeBody).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
-        sendEmailRequest(fullRaw);
-      };
-      reader.readAsDataURL(file);
-    } else {
-      mimeBody = body;
-      const fullRaw = btoa(headers + '\r\n\r\n' + mimeBody).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
-      sendEmailRequest(fullRaw);
-    }
-
-    function sendEmailRequest(encoded) {
-      fetch('https://gmail.googleapis.com/gmail/v1/users/me/messages/send', {
+    // Update Gmail to remove UNREAD label so it stays read after refresh
+    const threadId = subjectDiv.closest('li')?.dataset.threadId;
+    if (threadId) {
+      fetch(`https://gmail.googleapis.com/gmail/v1/users/me/threads/${threadId}/modify`, {
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${access_token}`,
           'Content-Type': 'application/json'
         },
-        body: JSON.stringify({ raw: encoded })
-      })
-      .then(res => res.json())
-      .then(() => {
-        alert('Reply sent!');
-        box.querySelector('.body').value = '';
-        fileInput.value = '';
-      })
-      .catch(err => {
-        console.error('Failed to send reply:', err);
-        alert('Failed to send reply.');
+        body: JSON.stringify({ removeLabelIds: ['UNREAD'] })
       });
     }
   }
