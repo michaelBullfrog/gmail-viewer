@@ -183,67 +183,71 @@ function loadInbox() {
       loading = false;
       if (!data.messages) return;
 
-      if (!nextPageToken) {
-        const newestMessageId = data.messages[0]?.id;
-        if (lastMessageId && newestMessageId && newestMessageId !== lastMessageId) {
-          new Notification('📬 New Email Received!');
-        }
-        lastMessageId = newestMessageId;
-      }
-
       nextPageToken = data.nextPageToken || '';
       const list = document.getElementById('emails');
 
-      data.messages.forEach(msg => {
-        fetch(`https://gmail.googleapis.com/gmail/v1/users/me/threads/${msg.threadId}`, {
-          headers: { 'Authorization': `Bearer ${access_token}` }
-        })
-        .then(res => res.json())
-        .then(thread => {
-          const item = document.createElement('li');
-          const sortedMessages = thread.messages.sort((a, b) => parseInt(b.internalDate) - parseInt(a.internalDate));
-          const newestMsg = sortedMessages[0];
-          const newestDate = formatDate(new Date(parseInt(newestMsg.internalDate)));
-          const subject = newestMsg.payload.headers.find(h => h.name === 'Subject')?.value || '(No Subject)';
-          const first = thread.messages[0];
-          const isUnread = first.labelIds?.includes("UNREAD");
-          const newBadge = isUnread ? `<span class="new-badge">NEW</span>` : '';
+      // First, fetch metadata for sorting
+      Promise.all(
+        data.messages.map(msg =>
+          fetch(`https://gmail.googleapis.com/gmail/v1/users/me/messages/${msg.id}`, {
+            headers: { 'Authorization': `Bearer ${access_token}` }
+          }).then(res => res.json())
+        )
+      ).then(messageDetails => {
+        const sortedMessages = messageDetails.sort((a, b) => parseInt(b.internalDate) - parseInt(a.internalDate));
 
-          let threadHtml = '';
-          sortedMessages.forEach(m => {
-            const from = m.payload.headers.find(h => h.name === 'From')?.value || '(Unknown)';
-            const date = formatDate(new Date(parseInt(m.internalDate)));
-            const part = m.payload.parts?.find(p => p.mimeType === 'text/plain') || m.payload;
-            const body = part.body.data ? atob(part.body.data.replace(/-/g, '+').replace(/_/g, '/')) : '(No body)';
-            threadHtml += `
-              <div class="thread-body">
-                <div class="meta">From: ${from}<br>Date: ${date}</div>
-                <div class="email-body">${body}</div>
-              </div>`;
-          });
+        sortedMessages.forEach(message => {
+          fetch(`https://gmail.googleapis.com/gmail/v1/users/me/threads/${message.threadId}`, {
+            headers: { 'Authorization': `Bearer ${access_token}` }
+          })
+            .then(res => res.json())
+            .then(thread => {
+              const item = document.createElement('li');
+              const sortedThread = thread.messages.sort((a, b) => parseInt(b.internalDate) - parseInt(a.internalDate));
+              const newestMsg = sortedThread[0];
+              const newestDate = formatDate(new Date(parseInt(newestMsg.internalDate)));
+              const subject = newestMsg.payload.headers.find(h => h.name === 'Subject')?.value || '(No Subject)';
+              const first = thread.messages[0];
+              const isUnread = first.labelIds?.includes("UNREAD");
+              const newBadge = isUnread ? `<span class="new-badge">NEW</span>` : '';
 
-          item.innerHTML = `
-            <div class="subject${isUnread ? '' : ' read'}" onclick="toggleThread(this)">
-              ${subject}${newBadge}
-              <span style="float:right; font-size:0.85em; color:#666;">${newestDate}</span>
-            </div>
-            <div class="thread-container">
-              ${threadHtml}
-              <div class="reply-box">
-                <input type="text" class="cc" placeholder="CC (optional)">
-                <input type="text" class="bcc" placeholder="BCC (optional)">
-                <input type="file" class="attachment">
-                <textarea class="body" placeholder="Reply..."></textarea>
-                <button onclick="sendReply('${first.payload.headers.find(h => h.name === 'From')?.value}', '${subject}', this)">
-                  Send Reply
-                </button>
-              </div>
-            </div>`;
-          list.appendChild(item);
+              let threadHtml = '';
+              sortedThread.forEach(m => {
+                const from = m.payload.headers.find(h => h.name === 'From')?.value || '(Unknown)';
+                const date = formatDate(new Date(parseInt(m.internalDate)));
+                const part = m.payload.parts?.find(p => p.mimeType === 'text/plain') || m.payload;
+                const body = part.body.data ? atob(part.body.data.replace(/-/g, '+').replace(/_/g, '/')) : '(No body)';
+                threadHtml += `
+                  <div class="thread-body">
+                    <div class="meta">From: ${from}<br>Date: ${date}</div>
+                    <div class="email-body">${body}</div>
+                  </div>`;
+              });
+
+              item.innerHTML = `
+                <div class="subject${isUnread ? '' : ' read'}" onclick="toggleThread(this)">
+                  ${subject}${newBadge}
+                  <span style="float:right; font-size:0.85em; color:#666;">${newestDate}</span>
+                </div>
+                <div class="thread-container">
+                  ${threadHtml}
+                  <div class="reply-box">
+                    <input type="text" class="cc" placeholder="CC (optional)">
+                    <input type="text" class="bcc" placeholder="BCC (optional)">
+                    <input type="file" class="attachment">
+                    <textarea class="body" placeholder="Reply..."></textarea>
+                    <button onclick="sendReply('${first.payload.headers.find(h => h.name === 'From')?.value}', '${subject}', this)">
+                      Send Reply
+                    </button>
+                  </div>
+                </div>`;
+              list.appendChild(item);
+            });
         });
       });
     });
 }
+
 
   
 
