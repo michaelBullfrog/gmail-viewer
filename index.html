@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <title>Gmail Viewer – Full Threads</title>
+  <title>Gmail Viewer – Threaded + Collapsible</title>
   <script src="https://accounts.google.com/gsi/client" async defer></script>
   <style>
     body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; margin: 40px; background-color: #f4f7fa; color: #333; }
@@ -27,6 +27,9 @@
     }
     .thread-body {
       margin-top: 15px; padding-left: 15px; border-left: 3px solid #ccc;
+    }
+    .thread-container {
+      display: none;
     }
     .reply-box {
       margin-top: 10px;
@@ -218,21 +221,34 @@
             });
 
             item.innerHTML = `
-              <div class="subject${isUnread ? '' : ' read'}">${subject}${newBadge}</div>
-              ${threadHtml}
-              <div class="reply-box">
-                <input type="text" class="cc" placeholder="CC (optional)">
-                <input type="text" class="bcc" placeholder="BCC (optional)">
-                <input type="file" class="attachment">
-                <textarea class="body" placeholder="Reply..."></textarea>
-                <button onclick="sendReply('${first.payload.headers.find(h => h.name === 'From')?.value}', '${subject}', this)">
-                  Send Reply
-                </button>
+              <div class="subject${isUnread ? '' : ' read'}" onclick="toggleThread(this)">
+                ${subject}${newBadge}
+              </div>
+              <div class="thread-container">
+                ${threadHtml}
+                <div class="reply-box">
+                  <input type="text" class="cc" placeholder="CC (optional)">
+                  <input type="text" class="bcc" placeholder="BCC (optional)">
+                  <input type="file" class="attachment">
+                  <textarea class="body" placeholder="Reply..."></textarea>
+                  <button onclick="sendReply('${first.payload.headers.find(h => h.name === 'From')?.value}', '${subject}', this)">
+                    Send Reply
+                  </button>
+                </div>
               </div>`;
             list.appendChild(item);
           });
         });
       });
+  }
+
+  function toggleThread(subjectDiv) {
+    const container = subjectDiv.nextElementSibling;
+    const isHidden = container.style.display === 'none';
+    container.style.display = isHidden ? 'block' : 'none';
+    subjectDiv.classList.add('read');
+    const badge = subjectDiv.querySelector('.new-badge');
+    if (badge) badge.remove();
   }
 
   function sendReply(to, subject, button) {
