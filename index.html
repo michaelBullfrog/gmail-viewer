@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <title>Gmail Viewer with Reply & Notifications</title>
+  <title>Gmail Viewer with Filters & Notifications</title>
   <script src="https://accounts.google.com/gsi/client" async defer></script>
   <style>
     body {
@@ -14,7 +14,17 @@
 
     h1 {
       text-align: center;
+      margin-bottom: 20px;
+    }
+
+    #filterSection {
+      text-align: center;
       margin-bottom: 30px;
+    }
+
+    #timeFilter {
+      padding: 8px;
+      font-size: 1em;
     }
 
     #emails {
@@ -80,7 +90,7 @@
   <h1>My Gmail Inbox</h1>
 
   <div id="g_id_onload"
-       data-client_id="474892923870-2r0ksjol93ve88881n7p2glmv7onpd4l.apps.googleusercontent.com"
+       data-client_id="YOUR_CLIENT_ID"
        data-context="use"
        data-ux_mode="popup"
        data-callback="handleCredentialResponse"
@@ -97,6 +107,15 @@
        data-logo_alignment="left">
   </div>
 
+  <div id="filterSection">
+    <label for="timeFilter">Show: </label>
+    <select id="timeFilter" onchange="loadInbox()">
+      <option value="24h">Last 24 Hours</option>
+      <option value="7d">Last 7 Days</option>
+      <option value="all" selected>All</option>
+    </select>
+  </div>
+
   <ul id="emails"></ul>
 
   <script>
@@ -106,13 +125,13 @@
 
     function initializeTokenClient() {
       tokenClient = google.accounts.oauth2.initTokenClient({
-        client_id: '474892923870-2r0ksjol93ve88881n7p2glmv7onpd4l.apps.googleusercontent.com',
+        client_id: 'YOUR_CLIENT_ID',
         scope: 'https://www.googleapis.com/auth/gmail.modify',
         callback: (response) => {
           access_token = response.access_token;
           requestNotificationPermission();
           loadInbox();
-          setInterval(loadInbox, 60000); // Check for new emails every 60 seconds
+          setInterval(loadInbox, 60000); // Check every 60 sec
         },
       });
     }
@@ -129,10 +148,33 @@
       }
     }
 
+    function getTimeQuery() {
+      const filter = document.getElementById('timeFilter').value;
+      const now = new Date();
+      const qParts = [];
+
+      if (filter === '24h') {
+        const yesterday = new Date(now.getTime() - 24 * 60 * 60 * 1000);
+        qParts.push('after:' + formatDate(yesterday));
+      } else if (filter === '7d') {
+        const lastWeek = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
+        qParts.push('after:' + formatDate(lastWeek));
+      }
+
+      return qParts.join(' ');
+    }
+
+    function formatDate(date) {
+      return date.toISOString().split('T')[0].replace(/-/g, '/');
+    }
+
     function loadInbox() {
-      fetch('https://gmail.googleapis.com/gmail/v1/users/me/messages?maxResults=5', {
-        headers: { 'Authorization': `Bearer ${access_token}` }
-      })
+      const query = getTimeQuery();
+      const url = new URL('https://gmail.googleapis.com/gmail/v1/users/me/messages');
+      url.searchParams.set('maxResults', '5');
+      if (query) url.searchParams.set('q', query);
+
+      fetch(url, { headers: { 'Authorization': `Bearer ${access_token}` } })
       .then(res => res.json())
       .then(data => {
         if (!data.messages) return;
