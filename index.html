@@ -1,104 +1,32 @@
-<!-- Full updated HTML with CC/BCC, file attachment support, and fixed reply toggle -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <title>Gmail Viewer with Attachments</title>
+  <title>Gmail Viewer - Full Features</title>
   <script src="https://accounts.google.com/gsi/client" async defer></script>
   <style>
-    body {
-      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-      margin: 40px;
-      background-color: #f4f7fa;
-      color: #333;
-    }
+    body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; margin: 40px; background-color: #f4f7fa; color: #333; }
     h1 { text-align: center; margin-bottom: 10px; }
-    #filterSection {
-      text-align: center;
-      margin-bottom: 30px;
-    }
-    #filterSection select, #searchInput, #searchButton {
-      padding: 8px;
-      font-size: 1em;
-      margin: 0 5px;
-    }
-    #emails {
-      list-style: none;
-      padding: 0;
-      max-width: 800px;
-      margin: 0 auto;
-    }
-    #emails li {
-      background: #fff;
-      margin-bottom: 20px;
-      padding: 20px;
-      border-radius: 10px;
-      box-shadow: 0 2px 6px rgba(0, 0, 0, 0.1);
-    }
-    .subject {
-      font-weight: 600;
-      font-size: 1.1em;
-      color: #004d99;
-      cursor: pointer;
-    }
-    .meta {
-      font-size: 0.9em;
-      color: #777;
-      margin-bottom: 10px;
-    }
-    .email-body {
-      display: none;
-      margin-top: 10px;
-      background: #f2f2f2;
-      padding: 10px;
-      border-radius: 5px;
-      white-space: pre-wrap;
-    }
-    .reply-box {
-      margin-top: 10px;
-      display: none;
-    }
-    .reply-box input, .reply-box textarea {
-      width: 100%;
-      padding: 8px;
-      margin-top: 5px;
-      border-radius: 5px;
-      border: 1px solid #ccc;
-      font-size: 0.95em;
-    }
-    .reply-box textarea {
-      height: 80px;
-      resize: vertical;
-    }
-    .reply-box button {
-      margin-top: 10px;
-      padding: 8px 16px;
-      border: none;
-      border-radius: 5px;
-      background-color: #0073e6;
-      color: white;
-      cursor: pointer;
-      font-size: 0.95em;
-    }
+    #filterSection { text-align: center; margin-bottom: 30px; }
+    #filterSection select, #searchInput, #searchButton { padding: 8px; font-size: 1em; margin: 0 5px; }
+    #emails { list-style: none; padding: 0; max-width: 800px; margin: 0 auto; }
+    #emails li { background: #fff; margin-bottom: 20px; padding: 20px; border-radius: 10px; box-shadow: 0 2px 6px rgba(0, 0, 0, 0.1); }
+    .subject { font-weight: 600; font-size: 1.1em; color: #004d99; cursor: pointer; }
+    .meta { font-size: 0.9em; color: #777; margin-bottom: 10px; }
+    .email-body { display: none; margin-top: 10px; background: #f2f2f2; padding: 10px; border-radius: 5px; white-space: pre-wrap; }
+    .reply-box { margin-top: 10px; display: none; }
+    .reply-box input, .reply-box textarea { width: 100%; padding: 8px; margin-top: 5px; border-radius: 5px; border: 1px solid #ccc; font-size: 0.95em; }
+    .reply-box textarea { height: 80px; resize: vertical; }
+    .reply-box button { margin-top: 10px; padding: 8px 16px; border: none; border-radius: 5px; background-color: #0073e6; color: white; cursor: pointer; font-size: 0.95em; }
     .reply-box button:hover { background-color: #005bb5; }
-    #backToTop {
-      position: fixed;
-      bottom: 20px;
-      right: 20px;
-      display: none;
-      background-color: #0073e6;
-      color: white;
-      border: none;
-      padding: 10px 20px;
-      border-radius: 5px;
-      cursor: pointer;
-    }
+    #backToTop { position: fixed; bottom: 20px; right: 20px; display: none; background-color: #0073e6; color: white; border: none; padding: 10px 20px; border-radius: 5px; cursor: pointer; }
   </style>
 </head>
 <body>
   <h1>My Gmail Inbox</h1>
+
   <div id="g_id_onload"
-       data-client_id="474892923870-2r0ksjol93ve88881n7p2glmv7onpd4l.apps.googleusercontent.com"
+       data-client_id="YOUR_CLIENT_ID"
        data-context="use"
        data-ux_mode="popup"
        data-callback="handleCredentialResponse"
@@ -121,13 +49,12 @@
       <option value="7d">Last 7 Days</option>
       <option value="all" selected>All</option>
     </select>
+
     <label for="labelFilter">Label:</label>
     <select id="labelFilter" onchange="refreshInbox()">
       <option value="">All</option>
-      <option value="label:inbox">Inbox</option>
-      <option value="is:unread">Unread</option>
-      <option value="is:starred">Starred</option>
     </select>
+
     <input type="text" id="searchInput" placeholder="Search keywords...">
     <button id="searchButton" onclick="refreshInbox()">Search</button>
   </div>
@@ -144,10 +71,11 @@
 
     function initializeTokenClient() {
       tokenClient = google.accounts.oauth2.initTokenClient({
-        client_id: '474892923870-2r0ksjol93ve88881n7p2glmv7onpd4l.apps.googleusercontent.com',
+        client_id: 'YOUR_CLIENT_ID',
         scope: 'https://www.googleapis.com/auth/gmail.modify',
         callback: (response) => {
           access_token = response.access_token;
+          loadLabels();
           refreshInbox();
           setInterval(refreshInbox, 60000);
         },
@@ -160,6 +88,22 @@
       tokenClient.requestAccessToken();
     }
 
+    function loadLabels() {
+      fetch('https://gmail.googleapis.com/gmail/v1/users/me/labels', {
+        headers: { 'Authorization': `Bearer ${access_token}` }
+      })
+      .then(res => res.json())
+      .then(data => {
+        const dropdown = document.getElementById('labelFilter');
+        data.labels.forEach(label => {
+          const option = document.createElement('option');
+          option.value = `label:${label.id}`;
+          option.textContent = label.name;
+          dropdown.appendChild(option);
+        });
+      });
+    }
+
     function formatDate(date) {
       return date.toISOString().split('T')[0].replace(/-/g, '/');
     }
@@ -170,13 +114,8 @@
       const searchTerm = document.getElementById('searchInput').value.trim();
       const now = new Date();
       const qParts = [];
-      if (timeFilter === '24h') {
-        const yesterday = new Date(now.getTime() - 86400000);
-        qParts.push('after:' + formatDate(yesterday));
-      } else if (timeFilter === '7d') {
-        const lastWeek = new Date(now.getTime() - 604800000);
-        qParts.push('after:' + formatDate(lastWeek));
-      }
+      if (timeFilter === '24h') qParts.push('after:' + formatDate(new Date(now.getTime() - 86400000)));
+      if (timeFilter === '7d') qParts.push('after:' + formatDate(new Date(now.getTime() - 604800000)));
       if (labelFilter) qParts.push(labelFilter);
       if (searchTerm) qParts.push(searchTerm);
       return qParts.join(' ');
@@ -310,9 +249,7 @@
 
     window.onload = () => {
       if (window.google && google.accounts) initializeTokenClient();
-      else setTimeout(() => {
-        if (window.google && google.accounts) initializeTokenClient();
-      }, 1000);
+      else setTimeout(() => { if (window.google && google.accounts) initializeTokenClient(); }, 1000);
     };
   </script>
 </body>
