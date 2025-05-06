@@ -8,7 +8,7 @@
     body { font-family: Arial, sans-serif; margin: 40px; background-color: #f4f7fa; color: #333; }
     h1 { text-align: center; margin-bottom: 10px; }
     #filterSection { text-align: center; margin-bottom: 30px; }
-    #filterSection select, #searchInput, #searchButton {
+    #filterSection select, #searchInput, #searchButton, #newFolderInput {
       padding: 8px; font-size: 1em; margin: 0 5px;
     }
     #emails { list-style: none; padding: 0; max-width: 800px; margin: 0 auto; }
@@ -97,6 +97,10 @@
 
     <input type="text" id="searchInput" placeholder="Search keywords...">
     <button id="searchButton" onclick="refreshInbox()">Search</button>
+
+    <br><br>
+    <input type="text" id="newFolderInput" placeholder="New folder name..." />
+    <button onclick="createFolder()">Create Folder</button>
   </div>
 
   <ul id="emails"></ul>
@@ -118,7 +122,7 @@
       scope: 'https://www.googleapis.com/auth/gmail.modify',
       callback: (response) => {
         access_token = response.access_token;
-        loadLabels(); // Load label list
+        loadLabels();
         refreshInbox();
         setInterval(refreshInbox, 120000);
       },
@@ -153,6 +157,40 @@
     });
   }
 
+  function createFolder() {
+    const folderName = document.getElementById('newFolderInput').value.trim();
+    if (!folderName) {
+      alert("Please enter a folder name.");
+      return;
+    }
+
+    fetch('https://gmail.googleapis.com/gmail/v1/users/me/labels', {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${access_token}`,
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({
+        name: folderName,
+        labelListVisibility: 'labelShow',
+        messageListVisibility: 'show'
+      })
+    })
+    .then(response => response.json())
+    .then(data => {
+      if (data.id) {
+        alert(`Folder "${folderName}" created successfully!`);
+        loadLabels(); // refresh label list
+      } else {
+        alert("Failed to create folder.");
+      }
+    })
+    .catch(err => {
+      console.error(err);
+      alert("Error creating folder.");
+    });
+  }
+
   function getTimeQuery() {
     const timeFilter = document.getElementById('timeFilter').value;
     const labelFilter = document.getElementById('labelFilter').value;
@@ -171,7 +209,8 @@
     document.getElementById('emails').innerHTML = '';
     loadInbox();
   }
-
+</script>
+<script>
   function loadInbox() {
     if (loading) return;
     loading = true;
@@ -253,10 +292,9 @@
         });
       });
   }
-</script>
-<script>
+
   function toggleThread(subjectDiv) {
-    const container = subjectDiv.nextElementSibling?.nextElementSibling; // Skip dropdown
+    const container = subjectDiv.nextElementSibling?.nextElementSibling;
     const isHidden = container?.style.display === 'none';
     if (container) {
       container.style.display = isHidden ? 'block' : 'none';
