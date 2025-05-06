@@ -171,6 +171,9 @@
 function loadInbox() {
   if (loading) return;
   loading = true;
+  const item = document.createElement('li');
+item.setAttribute('data-thread-id', fullThread.id); // <-- Add this line
+
 
   const query = getTimeQuery();
   const url = new URL('https://gmail.googleapis.com/gmail/v1/users/me/threads');
@@ -243,13 +246,28 @@ function loadInbox() {
 }
 
   function toggleThread(subjectDiv) {
-    const container = subjectDiv.nextElementSibling;
-    const isHidden = container.style.display === 'none';
-    container.style.display = isHidden ? 'block' : 'none';
-    subjectDiv.classList.add('read');
-    const badge = subjectDiv.querySelector('.new-badge');
-    if (badge) badge.remove();
-  }
+  const container = subjectDiv.nextElementSibling;
+  const isHidden = container.style.display === 'none';
+  container.style.display = isHidden ? 'block' : 'none';
+
+  // Mark as visually read
+  subjectDiv.classList.add('read');
+  const badge = subjectDiv.querySelector('.new-badge');
+  if (badge) badge.remove();
+
+  // Mark as read in Gmail so it doesn't come back after refresh
+  const threadId = subjectDiv.closest('li').dataset.threadId;
+  fetch(`https://gmail.googleapis.com/gmail/v1/users/me/threads/${threadId}/modify`, {
+    method: 'POST',
+    headers: {
+      'Authorization': `Bearer ${access_token}`,
+      'Content-Type': 'application/json'
+    },
+    body: JSON.stringify({
+      removeLabelIds: ['UNREAD']
+    })
+  });
+}
   function sendReply(to, subject, button) {
     const box = button.closest('.reply-box');
     const cc = box.querySelector('.cc').value.trim();
