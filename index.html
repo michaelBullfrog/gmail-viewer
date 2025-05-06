@@ -1,8 +1,9 @@
+<!-- Gmail Viewer - Simplified Label Options with "NEW" Tag -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <title>Gmail Viewer - Full Features</title>
+  <title>Gmail Viewer - Enhanced</title>
   <script src="https://accounts.google.com/gsi/client" async defer></script>
   <style>
     body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; margin: 40px; background-color: #f4f7fa; color: #333; }
@@ -11,20 +12,21 @@
     #filterSection select, #searchInput, #searchButton { padding: 8px; font-size: 1em; margin: 0 5px; }
     #emails { list-style: none; padding: 0; max-width: 800px; margin: 0 auto; }
     #emails li { background: #fff; margin-bottom: 20px; padding: 20px; border-radius: 10px; box-shadow: 0 2px 6px rgba(0, 0, 0, 0.1); }
-    .subject { font-weight: 600; font-size: 1.1em; color: #004d99; cursor: pointer; }
+    .subject { font-weight: 700; font-size: 1.1em; color: #004d99; cursor: pointer; }
+    .subject.read { font-weight: normal; }
     .meta { font-size: 0.9em; color: #777; margin-bottom: 10px; }
     .email-body { display: none; margin-top: 10px; background: #f2f2f2; padding: 10px; border-radius: 5px; white-space: pre-wrap; }
     .reply-box { margin-top: 10px; display: none; }
     .reply-box input, .reply-box textarea { width: 100%; padding: 8px; margin-top: 5px; border-radius: 5px; border: 1px solid #ccc; font-size: 0.95em; }
     .reply-box textarea { height: 80px; resize: vertical; }
-    .reply-box button { margin-top: 10px; padding: 8px 16px; border: none; border-radius: 5px; background-color: #0073e6; color: white; cursor: pointer; font-size: 0.95em; }
+    .reply-box button { margin-top: 10px; padding: 8px 16px; border: none; border-radius: 5px; background-color: #0073e6; color: white; cursor: pointer; font-size: 0.95em; font-weight: 600; text-align: center; }
     .reply-box button:hover { background-color: #005bb5; }
-    #backToTop { position: fixed; bottom: 20px; right: 20px; display: none; background-color: #0073e6; color: white; border: none; padding: 10px 20px; border-radius: 5px; cursor: pointer; }
+    #backToTop { position: fixed; bottom: 20px; right: 20px; display: none; background-color: #0073e6; color: white; border: none; padding: 10px 20px; border-radius: 5px; cursor: pointer; font-weight: 600; text-align: center; }
+    .new-badge { color: red; font-size: 0.9em; font-weight: bold; margin-left: 10px; }
   </style>
 </head>
 <body>
   <h1>My Gmail Inbox</h1>
-
   <div id="g_id_onload"
        data-client_id="474892923870-2r0ksjol93ve88881n7p2glmv7onpd4l.apps.googleusercontent.com"
        data-context="use"
@@ -52,7 +54,11 @@
 
     <label for="labelFilter">Label:</label>
     <select id="labelFilter" onchange="refreshInbox()">
-      <option value="">All</option>
+      <option value="label:INBOX">Inbox</option>
+      <option value="label:SENT">Sent Mail</option>
+      <option value="label:DRAFT">Drafts</option>
+      <option value="label:SPAM">Junk / Spam</option>
+      <option value="label:TRASH">Deleted Items</option>
     </select>
 
     <input type="text" id="searchInput" placeholder="Search keywords...">
@@ -75,7 +81,6 @@
         scope: 'https://www.googleapis.com/auth/gmail.modify',
         callback: (response) => {
           access_token = response.access_token;
-          loadLabels();
           refreshInbox();
           setInterval(refreshInbox, 60000);
         },
@@ -86,22 +91,6 @@
       const decoded = JSON.parse(atob(response.credential.split('.')[1]));
       document.body.insertAdjacentHTML('afterbegin', `<p style='text-align:center;'>Welcome, ${decoded.name}</p>`);
       tokenClient.requestAccessToken();
-    }
-
-    function loadLabels() {
-      fetch('https://gmail.googleapis.com/gmail/v1/users/me/labels', {
-        headers: { 'Authorization': `Bearer ${access_token}` }
-      })
-      .then(res => res.json())
-      .then(data => {
-        const dropdown = document.getElementById('labelFilter');
-        data.labels.forEach(label => {
-          const option = document.createElement('option');
-          option.value = `label:${label.id}`;
-          option.textContent = label.name;
-          dropdown.appendChild(option);
-        });
-      });
     }
 
     function formatDate(date) {
@@ -159,11 +148,13 @@
                 const headers = fullMsg.payload.headers;
                 const subject = headers.find(h => h.name === 'Subject')?.value || '(No Subject)';
                 const from = headers.find(h => h.name === 'From')?.value || '(Unknown)';
+                const isUnread = fullMsg.labelIds?.includes("UNREAD");
+                const newBadge = isUnread ? `<span class="new-badge">NEW</span>` : '';
                 const part = fullMsg.payload.parts?.find(p => p.mimeType === 'text/plain') || fullMsg.payload;
                 const body = part.body.data ? atob(part.body.data.replace(/-/g, '+').replace(/_/g, '/')) : '(No body)';
                 const item = document.createElement('li');
                 item.innerHTML = `
-                  <div class="subject" onclick="toggleReply(this)">${subject}</div>
+                  <div class="subject${isUnread ? '' : ' read'}" onclick="toggleReply(this)">${subject}${newBadge}</div>
                   <div class="meta">From: ${from}</div>
                   <div class="email-body">${body}</div>
                   <div class="reply-box">
@@ -186,71 +177,10 @@
       const isVisible = body.style.display === 'block';
       body.style.display = isVisible ? 'none' : 'block';
       box.style.display = isVisible ? 'none' : 'block';
+      subjectDiv.classList.add('read');
+      const badge = subjectDiv.querySelector('.new-badge');
+      if (badge) badge.remove();
     }
-
-    function sendReply(to, subject, button) {
-      const wrapper = button.parentElement;
-      const cc = wrapper.querySelector('.cc').value.trim();
-      const bcc = wrapper.querySelector('.bcc').value.trim();
-      const bodyText = wrapper.querySelector('.body').value.trim();
-      const fileInput = wrapper.querySelector('.attachment');
-      if (!bodyText && !fileInput.files.length) return alert('Please add a message or attachment.');
-
-      const headers = [`To: ${to}`, `Subject: Re: ${subject}`];
-      if (cc) headers.push(`Cc: ${cc}`);
-      if (bcc) headers.push(`Bcc: ${bcc}`);
-      headers.push('MIME-Version: 1.0');
-
-      if (!fileInput.files.length) {
-        headers.push('Content-Type: text/plain; charset="UTF-8"');
-        const raw = [...headers, '', bodyText].join('\n');
-        const encoded = btoa(raw).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
-        return sendRaw(encoded, wrapper);
-      }
-
-      const file = fileInput.files[0];
-      const reader = new FileReader();
-      reader.onload = () => {
-        const boundary = "foo_bar_baz";
-        const part1 = `--${boundary}\nContent-Type: text/plain; charset="UTF-8"\n\n${bodyText}\n`;
-        const part2 = `--${boundary}\nContent-Type: ${file.type}\nContent-Disposition: attachment; filename="${file.name}"\n\n${reader.result.split(',')[1]}\n--${boundary}--`;
-        const mime = [...headers, `Content-Type: multipart/mixed; boundary="${boundary}"`, '', part1, part2].join('\n');
-        const encoded = btoa(mime).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
-        sendRaw(encoded, wrapper);
-      };
-      reader.readAsDataURL(file);
-    }
-
-    function sendRaw(encoded, wrapper) {
-      fetch('https://gmail.googleapis.com/gmail/v1/users/me/messages/send', {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${access_token}`,
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({ raw: encoded })
-      })
-        .then(res => res.json())
-        .then(() => {
-          alert('Reply sent!');
-          wrapper.querySelector('.body').value = '';
-          wrapper.querySelector('.attachment').value = '';
-        })
-        .catch(err => {
-          console.error('Failed to send reply:', err);
-          alert('Failed to send reply.');
-        });
-    }
-
-    window.onscroll = () => {
-      if ((window.innerHeight + window.scrollY) >= document.body.offsetHeight - 50) loadInbox();
-      document.getElementById('backToTop').style.display = window.scrollY > 300 ? 'block' : 'none';
-    };
-
-    window.onload = () => {
-      if (window.google && google.accounts) initializeTokenClient();
-      else setTimeout(() => { if (window.google && google.accounts) initializeTokenClient(); }, 1000);
-    };
   </script>
 </body>
 </html>
