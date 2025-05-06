@@ -27,7 +27,7 @@
 <body>
   <h1>My Gmail Inbox</h1>
   <div id="g_id_onload"
-       data-client_id="YOUR_CLIENT_ID"
+       data-client_id="474892923870-2r0ksjol93ve88881n7p2glmv7onpd4l.apps.googleusercontent.com"
        data-context="use"
        data-ux_mode="popup"
        data-callback="handleCredentialResponse"
@@ -76,7 +76,7 @@
 
     function initializeTokenClient() {
       tokenClient = google.accounts.oauth2.initTokenClient({
-        client_id: 'YOUR_CLIENT_ID',
+        client_id: '474892923870-2r0ksjol93ve88881n7p2glmv7onpd4l.apps.googleusercontent.com',
         scope: 'https://www.googleapis.com/auth/gmail.modify',
         callback: (response) => {
           access_token = response.access_token;
