@@ -35,52 +35,65 @@
   <ul id="emails"></ul>
 
   <script>
-    let access_token = '';
+  let access_token = '';
+  let tokenClient;
 
-    const tokenClient = google.accounts.oauth2.initTokenClient({
-      client_id: '474892923870-2r0ksjol93ve88881n7p2glmv7onpd4l.apps.googleusercontent.com',
+  function initializeTokenClient() {
+    tokenClient = google.accounts.oauth2.initTokenClient({
+      client_id: 'YOUR_CLIENT_ID',
       scope: 'https://www.googleapis.com/auth/gmail.readonly',
       callback: (response) => {
         access_token = response.access_token;
         loadInbox();
       },
     });
+  }
 
-    function handleCredentialResponse(response) {
-      const decoded = JSON.parse(atob(response.credential.split('.')[1]));
-      document.body.insertAdjacentHTML('beforeend', `<p>Welcome, ${decoded.name}</p>`);
-      tokenClient.requestAccessToken();
-    }
+  function handleCredentialResponse(response) {
+    const decoded = JSON.parse(atob(response.credential.split('.')[1]));
+    document.body.insertAdjacentHTML('beforeend', `<p>Welcome, ${decoded.name}</p>`);
+    tokenClient.requestAccessToken();
+  }
 
-    function loadInbox() {
-      fetch('https://gmail.googleapis.com/gmail/v1/users/me/messages?maxResults=5', {
-        headers: {
-          'Authorization': `Bearer ${access_token}`
-        }
-      })
-      .then(res => res.json())
-      .then(data => {
-        const list = document.getElementById('emails');
-        list.innerHTML = '';
-        if (data.messages) {
-          data.messages.forEach(msg => {
-            fetch(`https://gmail.googleapis.com/gmail/v1/users/me/messages/${msg.id}`, {
-              headers: {
-                'Authorization': `Bearer ${access_token}`
-              }
-            })
-            .then(res => res.json())
-            .then(fullMsg => {
-              const item = document.createElement('li');
-              item.textContent = fullMsg.snippet;
-              list.appendChild(item);
-            });
+  function loadInbox() {
+    fetch('https://gmail.googleapis.com/gmail/v1/users/me/messages?maxResults=5', {
+      headers: {
+        'Authorization': `Bearer ${access_token}`
+      }
+    })
+    .then(res => res.json())
+    .then(data => {
+      const list = document.getElementById('emails');
+      list.innerHTML = '';
+      if (data.messages) {
+        data.messages.forEach(msg => {
+          fetch(`https://gmail.googleapis.com/gmail/v1/users/me/messages/${msg.id}`, {
+            headers: {
+              'Authorization': `Bearer ${access_token}`
+            }
+          })
+          .then(res => res.json())
+          .then(fullMsg => {
+            const item = document.createElement('li');
+            item.textContent = fullMsg.snippet;
+            list.appendChild(item);
           });
-        } else {
-          list.innerHTML = '<li>No messages found.</li>';
-        }
-      });
+        });
+      } else {
+        list.innerHTML = '<li>No messages found.</li>';
+      }
+    });
+  }
+
+  // Wait for GIS to load before calling init
+  window.onload = function () {
+    if (window.google && google.accounts) {
+      initializeTokenClient();
+    } else {
+      window.setTimeout(() => {
+        initializeTokenClient();
+      }, 1000); // delay fallback
     }
-  </script>
-</body>
-</html>
+  };
+</script>
+
