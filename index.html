@@ -1,8 +1,9 @@
+<!-- Full updated HTML with CC/BCC -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <title>Gmail Viewer with Search</title>
+  <title>Gmail Viewer with CC and BCC</title>
   <script src="https://accounts.google.com/gsi/client" async defer></script>
   <style>
     body {
@@ -57,14 +58,17 @@
       margin-top: 10px;
       display: none;
     }
-    .reply-box textarea {
+    .reply-box input, .reply-box textarea {
       width: 100%;
-      height: 80px;
-      padding: 10px;
+      padding: 8px;
+      margin-top: 5px;
       border-radius: 5px;
       border: 1px solid #ccc;
-      resize: vertical;
       font-size: 0.95em;
+    }
+    .reply-box textarea {
+      height: 80px;
+      resize: vertical;
     }
     .reply-box button {
       margin-top: 10px;
@@ -94,7 +98,6 @@
 <body>
   <h1>My Gmail Inbox</h1>
 
-  <!-- ✅ Sign-In Buttons -->
   <div id="g_id_onload"
        data-client_id="474892923870-2r0ksjol93ve88881n7p2glmv7onpd4l.apps.googleusercontent.com"
        data-context="use"
@@ -103,7 +106,6 @@
        data-auto_prompt="false"
        data-scope="https://www.googleapis.com/auth/gmail.modify">
   </div>
-
   <div class="g_id_signin"
        data-type="standard"
        data-shape="rectangular"
@@ -113,7 +115,6 @@
        data-logo_alignment="left">
   </div>
 
-  <!-- ✅ Filters + Search -->
   <div id="filterSection">
     <label for="timeFilter">Time:</label>
     <select id="timeFilter" onchange="refreshInbox()">
@@ -121,7 +122,6 @@
       <option value="7d">Last 7 Days</option>
       <option value="all" selected>All</option>
     </select>
-
     <label for="labelFilter">Label:</label>
     <select id="labelFilter" onchange="refreshInbox()">
       <option value="">All</option>
@@ -129,7 +129,6 @@
       <option value="is:unread">Unread</option>
       <option value="is:starred">Starred</option>
     </select>
-
     <input type="text" id="searchInput" placeholder="Search keywords...">
     <button id="searchButton" onclick="refreshInbox()">Search</button>
   </div>
@@ -158,7 +157,7 @@
 
     function handleCredentialResponse(response) {
       const decoded = JSON.parse(atob(response.credential.split('.')[1]));
-      document.body.insertAdjacentHTML('afterbegin', `<p style="text-align:center;">Welcome, ${decoded.name}</p>`);
+      document.body.insertAdjacentHTML('afterbegin', `<p style='text-align:center;'>Welcome, ${decoded.name}</p>`);
       tokenClient.requestAccessToken();
     }
 
@@ -172,7 +171,6 @@
       const searchTerm = document.getElementById('searchInput').value.trim();
       const now = new Date();
       const qParts = [];
-
       if (timeFilter === '24h') {
         const yesterday = new Date(now.getTime() - 86400000);
         qParts.push('after:' + formatDate(yesterday));
@@ -182,7 +180,6 @@
       }
       if (labelFilter) qParts.push(labelFilter);
       if (searchTerm) qParts.push(searchTerm);
-
       return qParts.join(' ');
     }
 
@@ -195,7 +192,6 @@
     function loadInbox() {
       if (loading) return;
       loading = true;
-
       const query = getTimeQuery();
       const url = new URL('https://gmail.googleapis.com/gmail/v1/users/me/messages');
       url.searchParams.set('maxResults', '10');
@@ -207,7 +203,6 @@
         .then(data => {
           loading = false;
           if (!data.messages) return;
-
           if (!nextPageToken) {
             const newestMessageId = data.messages[0]?.id;
             if (lastMessageId && newestMessageId && newestMessageId !== lastMessageId) {
@@ -215,10 +210,8 @@
             }
             lastMessageId = newestMessageId;
           }
-
           nextPageToken = data.nextPageToken || '';
           const list = document.getElementById('emails');
-
           data.messages.forEach(msg => {
             fetch(`https://gmail.googleapis.com/gmail/v1/users/me/messages/${msg.id}`, {
               headers: { 'Authorization': `Bearer ${access_token}` }
@@ -230,17 +223,17 @@
                 const from = headers.find(h => h.name === 'From')?.value || '(Unknown)';
                 const part = fullMsg.payload.parts?.find(p => p.mimeType === 'text/plain') || fullMsg.payload;
                 const body = part.body.data ? atob(part.body.data.replace(/-/g, '+').replace(/_/g, '/')) : '(No body)';
-
                 const item = document.createElement('li');
                 item.innerHTML = `
                   <div class="subject">${subject}</div>
                   <div class="meta">From: ${from}</div>
                   <div class="email-body">${body}</div>
                   <div class="reply-box">
-                    <textarea placeholder="Reply..."></textarea>
+                    <input type="text" class="cc" placeholder="CC (optional)">
+                    <input type="text" class="bcc" placeholder="BCC (optional)">
+                    <textarea class="body" placeholder="Reply..."></textarea>
                     <button onclick="sendReply('${from}', '${subject}', this)">Send Reply</button>
-                  </div>
-                `;
+                  </div>`;
                 item.addEventListener('click', () => {
                   const bodyEl = item.querySelector('.email-body');
                   const replyEl = item.querySelector('.reply-box');
@@ -255,12 +248,18 @@
     }
 
     function sendReply(to, subject, button) {
-      const textarea = button.previousElementSibling;
-      const messageBody = textarea.value.trim();
-      if (!messageBody) return alert('Please write a reply.');
+      const wrapper = button.parentElement;
+      const cc = wrapper.querySelector('.cc').value.trim();
+      const bcc = wrapper.querySelector('.bcc').value.trim();
+      const bodyText = wrapper.querySelector('.body').value.trim();
+      if (!bodyText) return alert('Please write a reply.');
 
-      const raw = [`To: ${to}`, `Subject: Re: ${subject}`, '', messageBody].join('\n');
-      const base64EncodedEmail = btoa(raw).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+      const headers = [`To: ${to}`, `Subject: Re: ${subject}`];
+      if (cc) headers.push(`Cc: ${cc}`);
+      if (bcc) headers.push(`Bcc: ${bcc}`);
+
+      const raw = [...headers, '', bodyText].join('\n');
+      const encoded = btoa(raw).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
 
       fetch('https://gmail.googleapis.com/gmail/v1/users/me/messages/send', {
         method: 'POST',
@@ -268,12 +267,12 @@
           'Authorization': `Bearer ${access_token}`,
           'Content-Type': 'application/json'
         },
-        body: JSON.stringify({ raw: base64EncodedEmail })
+        body: JSON.stringify({ raw: encoded })
       })
         .then(res => res.json())
         .then(() => {
           alert('Reply sent!');
-          textarea.value = '';
+          wrapper.querySelector('.body').value = '';
         })
         .catch(err => {
           console.error('Failed to send reply:', err);
@@ -282,9 +281,7 @@
     }
 
     window.onscroll = function () {
-      if ((window.innerHeight + window.scrollY) >= document.body.offsetHeight - 50) {
-        loadInbox();
-      }
+      if ((window.innerHeight + window.scrollY) >= document.body.offsetHeight - 50) loadInbox();
       document.getElementById('backToTop').style.display = window.scrollY > 300 ? 'block' : 'none';
     };
 
@@ -293,11 +290,7 @@
         initializeTokenClient();
       } else {
         setTimeout(() => {
-          if (window.google && google.accounts) {
-            initializeTokenClient();
-          } else {
-            console.error('Google Identity Services SDK failed to load.');
-          }
+          if (window.google && google.accounts) initializeTokenClient();
         }, 1000);
       }
     };
