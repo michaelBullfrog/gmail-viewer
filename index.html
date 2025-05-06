@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <title>Gmail Viewer with Filters & Notifications</title>
+  <title>Gmail Viewer with Search</title>
   <script src="https://accounts.google.com/gsi/client" async defer></script>
   <style>
     body {
@@ -14,7 +14,7 @@
 
     h1 {
       text-align: center;
-      margin-bottom: 20px;
+      margin-bottom: 10px;
     }
 
     #filterSection {
@@ -22,10 +22,10 @@
       margin-bottom: 30px;
     }
 
-    #filterSection select {
+    #filterSection select, #searchInput, #searchButton {
       padding: 8px;
       font-size: 1em;
-      margin: 0 10px;
+      margin: 0 5px;
     }
 
     #emails {
@@ -41,24 +41,33 @@
       padding: 20px;
       border-radius: 10px;
       box-shadow: 0 2px 6px rgba(0, 0, 0, 0.1);
+      cursor: pointer;
     }
 
     .subject {
       font-weight: 600;
       font-size: 1.1em;
-      margin-bottom: 5px;
       color: #004d99;
     }
 
-    pre {
+    .meta {
+      font-size: 0.9em;
+      color: #777;
+      margin-bottom: 10px;
+    }
+
+    .email-body {
+      display: none;
+      margin-top: 10px;
       background: #f2f2f2;
       padding: 10px;
       border-radius: 5px;
-      overflow-x: auto;
+      white-space: pre-wrap;
     }
 
     .reply-box {
-      margin-top: 15px;
+      margin-top: 10px;
+      display: none;
     }
 
     .reply-box textarea {
@@ -85,52 +94,52 @@
     .reply-box button:hover {
       background-color: #005bb5;
     }
+
+    #backToTop {
+      position: fixed;
+      bottom: 20px;
+      right: 20px;
+      display: none;
+      background-color: #0073e6;
+      color: white;
+      border: none;
+      padding: 10px 20px;
+      border-radius: 5px;
+      cursor: pointer;
+    }
   </style>
 </head>
 <body>
   <h1>My Gmail Inbox</h1>
-
-  <div id="g_id_onload"
-       data-client_id="474892923870-2r0ksjol93ve88881n7p2glmv7onpd4l.apps.googleusercontent.com"
-       data-context="use"
-       data-ux_mode="popup"
-       data-callback="handleCredentialResponse"
-       data-auto_prompt="false"
-       data-scope="https://www.googleapis.com/auth/gmail.modify">
-  </div>
-
-  <div class="g_id_signin"
-       data-type="standard"
-       data-shape="rectangular"
-       data-theme="outline"
-       data-text="signin_with"
-       data-size="large"
-       data-logo_alignment="left">
-  </div>
-
   <div id="filterSection">
     <label for="timeFilter">Time: </label>
-    <select id="timeFilter" onchange="loadInbox()">
+    <select id="timeFilter" onchange="refreshInbox()">
       <option value="24h">Last 24 Hours</option>
       <option value="7d">Last 7 Days</option>
       <option value="all" selected>All</option>
     </select>
 
     <label for="labelFilter">Label: </label>
-    <select id="labelFilter" onchange="loadInbox()">
+    <select id="labelFilter" onchange="refreshInbox()">
       <option value="">All</option>
       <option value="label:inbox">Inbox</option>
       <option value="is:unread">Unread</option>
       <option value="is:starred">Starred</option>
     </select>
+
+    <input type="text" id="searchInput" placeholder="Search keywords...">
+    <button id="searchButton" onclick="refreshInbox()">Search</button>
   </div>
 
   <ul id="emails"></ul>
+  <button id="backToTop" onclick="window.scrollTo({top: 0, behavior: 'smooth'})">Back to Top</button>
 
   <script>
     let access_token = '';
     let tokenClient;
     let lastMessageId = null;
+    let nextPageToken = '';
+    let loading = false;
 
     function initializeTokenClient() {
       tokenClient = google.accounts.oauth2.initTokenClient({
@@ -138,40 +147,34 @@
         scope: 'https://www.googleapis.com/auth/gmail.modify',
         callback: (response) => {
           access_token = response.access_token;
-          requestNotificationPermission();
-          loadInbox();
-          setInterval(loadInbox, 60000);
+          refreshInbox();
+          setInterval(refreshInbox, 60000);
         },
       });
     }
 
     function handleCredentialResponse(response) {
       const decoded = JSON.parse(atob(response.credential.split('.')[1]));
-      document.body.insertAdjacentHTML('afterbegin', `<p style="text-align:center;">Welcome, ${decoded.name}</p>`);
+      document.body.insertAdjacentHTML('afterbegin', `<p style='text-align:center;'>Welcome, ${decoded.name}</p>`);
       tokenClient.requestAccessToken();
     }
 
-    function requestNotificationPermission() {
-      if (Notification.permission !== 'granted') {
-        Notification.requestPermission();
-      }
-    }
-
     function getTimeQuery() {
-      const filter = document.getElementById('timeFilter').value;
-      const label = document.getElementById('labelFilter').value;
+      const timeFilter = document.getElementById('timeFilter').value;
+      const labelFilter = document.getElementById('labelFilter').value;
+      const searchTerm = document.getElementById('searchInput').value.trim();
       const now = new Date();
       const qParts = [];
 
-      if (filter === '24h') {
-        const yesterday = new Date(now.getTime() - 24 * 60 * 60 * 1000);
+      if (timeFilter === '24h') {
+        const yesterday = new Date(now.getTime() - 86400000);
         qParts.push('after:' + formatDate(yesterday));
-      } else if (filter === '7d') {
-        const lastWeek = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
+      } else if (timeFilter === '7d') {
+        const lastWeek = new Date(now.getTime() - 604800000);
         qParts.push('after:' + formatDate(lastWeek));
       }
-
-      if (label) qParts.push(label);
+      if (labelFilter) qParts.push(labelFilter);
+      if (searchTerm) qParts.push(searchTerm);
 
       return qParts.join(' ');
     }
@@ -180,51 +183,72 @@
       return date.toISOString().split('T')[0].replace(/-/g, '/');
     }
 
+    function refreshInbox() {
+      nextPageToken = '';
+      document.getElementById('emails').innerHTML = '';
+      loadInbox();
+    }
+
     function loadInbox() {
+      if (loading) return;
+      loading = true;
+
       const query = getTimeQuery();
       const url = new URL('https://gmail.googleapis.com/gmail/v1/users/me/messages');
       url.searchParams.set('maxResults', '10');
       if (query) url.searchParams.set('q', query);
+      if (nextPageToken) url.searchParams.set('pageToken', nextPageToken);
 
       fetch(url, { headers: { 'Authorization': `Bearer ${access_token}` } })
-      .then(res => res.json())
-      .then(data => {
-        if (!data.messages) return;
+        .then(res => res.json())
+        .then(data => {
+          loading = false;
+          if (!data.messages) return;
 
-        const newestMessageId = data.messages[0]?.id;
-        if (lastMessageId && newestMessageId && newestMessageId !== lastMessageId) {
-          new Notification('📬 New Email Received!');
-        }
-        lastMessageId = newestMessageId;
+          if (!nextPageToken) {
+            const newestMessageId = data.messages[0]?.id;
+            if (lastMessageId && newestMessageId && newestMessageId !== lastMessageId) {
+              new Notification('📬 New Email Received!');
+            }
+            lastMessageId = newestMessageId;
+          }
 
-        const list = document.getElementById('emails');
-        list.innerHTML = '';
-        data.messages.forEach(msg => {
-          fetch(`https://gmail.googleapis.com/gmail/v1/users/me/messages/${msg.id}`, {
-            headers: { 'Authorization': `Bearer ${access_token}` }
-          })
-          .then(res => res.json())
-          .then(fullMsg => {
-            const headers = fullMsg.payload.headers;
-            const subject = headers.find(h => h.name === 'Subject')?.value || '(No Subject)';
-            const from = headers.find(h => h.name === 'From')?.value || '(Unknown)';
-            const part = fullMsg.payload.parts?.find(p => p.mimeType === 'text/plain') || fullMsg.payload;
-            const body = part.body.data ? atob(part.body.data.replace(/-/g, '+').replace(/_/g, '/')) : '(No body)';
+          nextPageToken = data.nextPageToken || '';
 
-            const item = document.createElement('li');
-            item.innerHTML = `
-              <div class="subject">${subject}</div>
-              <div><strong>From:</strong> ${from}</div>
-              <pre>${body}</pre>
-              <div class="reply-box">
-                <textarea placeholder="Reply..."></textarea>
-                <button onclick="sendReply('${from}', '${subject}', this)">Send Reply</button>
-              </div>
-            `;
-            list.appendChild(item);
+          const list = document.getElementById('emails');
+          data.messages.forEach(msg => {
+            fetch(`https://gmail.googleapis.com/gmail/v1/users/me/messages/${msg.id}`, {
+              headers: { 'Authorization': `Bearer ${access_token}` }
+            })
+              .then(res => res.json())
+              .then(fullMsg => {
+                const headers = fullMsg.payload.headers;
+                const subject = headers.find(h => h.name === 'Subject')?.value || '(No Subject)';
+                const from = headers.find(h => h.name === 'From')?.value || '(Unknown)';
+                const part = fullMsg.payload.parts?.find(p => p.mimeType === 'text/plain') || fullMsg.payload;
+                const body = part.body.data ? atob(part.body.data.replace(/-/g, '+').replace(/_/g, '/')) : '(No body)';
+
+                const item = document.createElement('li');
+                item.innerHTML = `
+                  <div class="subject">${subject}</div>
+                  <div class="meta">From: ${from}</div>
+                  <div class="email-body">${body}</div>
+                  <div class="reply-box">
+                    <textarea placeholder="Reply..."></textarea>
+                    <button onclick="sendReply('${from}', '${subject}', this)">Send Reply</button>
+                  </div>
+                `;
+                item.addEventListener('click', () => {
+                  const bodyEl = item.querySelector('.email-body');
+                  const replyEl = item.querySelector('.reply-box');
+                  const visible = bodyEl.style.display === 'block';
+                  bodyEl.style.display = visible ? 'none' : 'block';
+                  replyEl.style.display = visible ? 'none' : 'block';
+                });
+                list.appendChild(item);
+              });
           });
         });
-      });
     }
 
     function sendReply(to, subject, button) {
@@ -248,26 +272,33 @@
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${access_token}`,
-          'Content-Type': 'application/json',
+          'Content-Type': 'application/json'
         },
         body: JSON.stringify({ raw: base64EncodedEmail })
       })
-      .then(res => res.json())
-      .then(data => {
-        alert('Reply sent!');
-        textarea.value = '';
-      })
-      .catch(err => {
-        console.error('Failed to send reply:', err);
-        alert('Failed to send reply.');
-      });
+        .then(res => res.json())
+        .then(data => {
+          alert('Reply sent!');
+          textarea.value = '';
+        })
+        .catch(err => {
+          console.error('Failed to send reply:', err);
+          alert('Failed to send reply.');
+        });
     }
+
+    window.onscroll = function () {
+      if ((window.innerHeight + window.scrollY) >= document.body.offsetHeight - 50) {
+        loadInbox();
+      }
+      document.getElementById('backToTop').style.display = window.scrollY > 300 ? 'block' : 'none';
+    };
 
     window.onload = function () {
       if (window.google && google.accounts) {
         initializeTokenClient();
       } else {
-        window.setTimeout(() => {
+        setTimeout(() => {
           if (window.google && google.accounts) {
             initializeTokenClient();
           } else {
