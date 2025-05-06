@@ -22,9 +22,10 @@
       margin-bottom: 30px;
     }
 
-    #timeFilter {
+    #filterSection select {
       padding: 8px;
       font-size: 1em;
+      margin: 0 10px;
     }
 
     #emails {
@@ -108,11 +109,19 @@
   </div>
 
   <div id="filterSection">
-    <label for="timeFilter">Show: </label>
+    <label for="timeFilter">Time: </label>
     <select id="timeFilter" onchange="loadInbox()">
       <option value="24h">Last 24 Hours</option>
       <option value="7d">Last 7 Days</option>
       <option value="all" selected>All</option>
+    </select>
+
+    <label for="labelFilter">Label: </label>
+    <select id="labelFilter" onchange="loadInbox()">
+      <option value="">All</option>
+      <option value="label:inbox">Inbox</option>
+      <option value="is:unread">Unread</option>
+      <option value="is:starred">Starred</option>
     </select>
   </div>
 
@@ -131,7 +140,7 @@
           access_token = response.access_token;
           requestNotificationPermission();
           loadInbox();
-          setInterval(loadInbox, 60000); // Check every 60 sec
+          setInterval(loadInbox, 60000);
         },
       });
     }
@@ -150,6 +159,7 @@
 
     function getTimeQuery() {
       const filter = document.getElementById('timeFilter').value;
+      const label = document.getElementById('labelFilter').value;
       const now = new Date();
       const qParts = [];
 
@@ -161,6 +171,8 @@
         qParts.push('after:' + formatDate(lastWeek));
       }
 
+      if (label) qParts.push(label);
+
       return qParts.join(' ');
     }
 
@@ -171,7 +183,7 @@
     function loadInbox() {
       const query = getTimeQuery();
       const url = new URL('https://gmail.googleapis.com/gmail/v1/users/me/messages');
-      url.searchParams.set('maxResults', '5');
+      url.searchParams.set('maxResults', '10');
       if (query) url.searchParams.set('q', query);
 
       fetch(url, { headers: { 'Authorization': `Bearer ${access_token}` } })
