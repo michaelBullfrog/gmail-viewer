@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <title>Gmail Viewer – Threaded + Collapsible</title>
+  <title>Gmail Viewer – Threads & Timestamps</title>
   <script src="https://accounts.google.com/gsi/client" async defer></script>
   <style>
     body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; margin: 40px; background-color: #f4f7fa; color: #333; }
@@ -132,7 +132,7 @@
       callback: (response) => {
         access_token = response.access_token;
         refreshInbox();
-        setInterval(refreshInbox, 60000);
+        setInterval(refreshInbox, 120000); // Refresh every 120 seconds
       },
     });
   }
@@ -208,17 +208,19 @@
             const newBadge = isUnread ? `<span class="new-badge">NEW</span>` : '';
 
             let threadHtml = '';
-            thread.messages.forEach(m => {
-              const from = m.payload.headers.find(h => h.name === 'From')?.value || '(Unknown)';
-              const date = formatDate(new Date(parseInt(m.internalDate)));
-              const part = m.payload.parts?.find(p => p.mimeType === 'text/plain') || m.payload;
-              const body = part.body.data ? atob(part.body.data.replace(/-/g, '+').replace(/_/g, '/')) : '(No body)';
-              threadHtml += `
-                <div class="thread-body">
-                  <div class="meta">From: ${from}<br>Date: ${date}</div>
-                  <div class="email-body">${body}</div>
-                </div>`;
-            });
+            thread.messages
+              .sort((a, b) => parseInt(b.internalDate) - parseInt(a.internalDate))
+              .forEach(m => {
+                const from = m.payload.headers.find(h => h.name === 'From')?.value || '(Unknown)';
+                const date = formatDate(new Date(parseInt(m.internalDate)));
+                const part = m.payload.parts?.find(p => p.mimeType === 'text/plain') || m.payload;
+                const body = part.body.data ? atob(part.body.data.replace(/-/g, '+').replace(/_/g, '/')) : '(No body)';
+                threadHtml += `
+                  <div class="thread-body">
+                    <div class="meta">From: ${from}<br>Date: ${date}</div>
+                    <div class="email-body">${body}</div>
+                  </div>`;
+              });
 
             item.innerHTML = `
               <div class="subject${isUnread ? '' : ' read'}" onclick="toggleThread(this)">
@@ -250,7 +252,6 @@
     const badge = subjectDiv.querySelector('.new-badge');
     if (badge) badge.remove();
   }
-
   function sendReply(to, subject, button) {
     const box = button.closest('.reply-box');
     const cc = box.querySelector('.cc').value.trim();
