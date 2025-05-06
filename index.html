@@ -2,12 +2,15 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <title>Gmail Viewer with Google Identity Services</title>
+  <title>Gmail Viewer with Reply</title>
   <script src="https://accounts.google.com/gsi/client" async defer></script>
   <style>
     body { font-family: Arial, sans-serif; margin: 40px; }
     #emails { list-style: none; padding: 0; }
-    #emails li { background: #f2f2f2; margin-bottom: 10px; padding: 10px; border-radius: 5px; }
+    #emails li { background: #f9f9f9; margin-bottom: 15px; padding: 15px; border-radius: 5px; border: 1px solid #ccc; }
+    .subject { font-weight: bold; }
+    .reply-box { margin-top: 10px; }
+    .reply-box textarea { width: 100%; height: 60px; }
   </style>
 </head>
 <body>
@@ -20,7 +23,7 @@
        data-ux_mode="popup"
        data-callback="handleCredentialResponse"
        data-auto_prompt="false"
-       data-scope="https://www.googleapis.com/auth/gmail.readonly">
+       data-scope="https://www.googleapis.com/auth/gmail.modify">
   </div>
 
   <div class="g_id_signin"
@@ -35,65 +38,115 @@
   <ul id="emails"></ul>
 
   <script>
-  let access_token = '';
-  let tokenClient;
+    let access_token = '';
+    let tokenClient;
 
-  function initializeTokenClient() {
-    tokenClient = google.accounts.oauth2.initTokenClient({
-      client_id: '474892923870-2r0ksjol93ve88881n7p2glmv7onpd4l.apps.googleusercontent.com',
-      scope: 'https://www.googleapis.com/auth/gmail.readonly',
-      callback: (response) => {
-        access_token = response.access_token;
-        loadInbox();
-      },
-    });
-  }
-
-  function handleCredentialResponse(response) {
-    const decoded = JSON.parse(atob(response.credential.split('.')[1]));
-    document.body.insertAdjacentHTML('beforeend', `<p>Welcome, ${decoded.name}</p>`);
-    tokenClient.requestAccessToken();
-  }
-
-  function loadInbox() {
-    fetch('https://gmail.googleapis.com/gmail/v1/users/me/messages?maxResults=5', {
-      headers: {
-        'Authorization': `Bearer ${access_token}`
-      }
-    })
-    .then(res => res.json())
-    .then(data => {
-      const list = document.getElementById('emails');
-      list.innerHTML = '';
-      if (data.messages) {
-        data.messages.forEach(msg => {
-          fetch(`https://gmail.googleapis.com/gmail/v1/users/me/messages/${msg.id}`, {
-            headers: {
-              'Authorization': `Bearer ${access_token}`
-            }
-          })
-          .then(res => res.json())
-          .then(fullMsg => {
-            const item = document.createElement('li');
-            item.textContent = fullMsg.snippet;
-            list.appendChild(item);
-          });
-        });
-      } else {
-        list.innerHTML = '<li>No messages found.</li>';
-      }
-    });
-  }
-
-  // Wait for GIS to load before calling init
-  window.onload = function () {
-    if (window.google && google.accounts) {
-      initializeTokenClient();
-    } else {
-      window.setTimeout(() => {
-        initializeTokenClient();
-      }, 1000); // delay fallback
+    function initializeTokenClient() {
+      tokenClient = google.accounts.oauth2.initTokenClient({
+        client_id: '474892923870-2r0ksjol93ve88881n7p2glmv7onpd4l.apps.googleusercontent.com',
+        scope: 'https://www.googleapis.com/auth/gmail.modify',
+        callback: (response) => {
+          access_token = response.access_token;
+          loadInbox();
+        },
+      });
     }
-  };
-</script>
 
+    function handleCredentialResponse(response) {
+      const decoded = JSON.parse(atob(response.credential.split('.')[1]));
+      document.body.insertAdjacentHTML('beforeend', `<p>Welcome, ${decoded.name}</p>`);
+      tokenClient.requestAccessToken();
+    }
+
+    function loadInbox() {
+      fetch('https://gmail.googleapis.com/gmail/v1/users/me/messages?maxResults=5', {
+        headers: { 'Authorization': `Bearer ${access_token}` }
+      })
+      .then(res => res.json())
+      .then(data => {
+        const list = document.getElementById('emails');
+        list.innerHTML = '';
+        if (data.messages) {
+          data.messages.forEach(msg => {
+            fetch(`https://gmail.googleapis.com/gmail/v1/users/me/messages/${msg.id}`, {
+              headers: { 'Authorization': `Bearer ${access_token}` }
+            })
+            .then(res => res.json())
+            .then(fullMsg => {
+              const headers = fullMsg.payload.headers;
+              const subject = headers.find(h => h.name === 'Subject')?.value || '(No Subject)';
+              const from = headers.find(h => h.name === 'From')?.value || '(Unknown)';
+              const part = fullMsg.payload.parts?.find(p => p.mimeType === 'text/plain') || fullMsg.payload;
+              const body = part.body.data ? atob(part.body.data.replace(/-/g, '+').replace(/_/g, '/')) : '(No body)';
+
+              const item = document.createElement('li');
+              item.innerHTML = `
+                <div class="subject">${subject}</div>
+                <div><strong>From:</strong> ${from}</div>
+                <pre>${body}</pre>
+                <div class="reply-box">
+                  <textarea placeholder="Reply..."></textarea>
+                  <button onclick="sendReply('${from}', '${subject}', this)">Send Reply</button>
+                </div>
+              `;
+              list.appendChild(item);
+            });
+          });
+        } else {
+          list.innerHTML = '<li>No messages found.</li>';
+        }
+      });
+    }
+
+    function sendReply(to, subject, button) {
+      const textarea = button.previousElementSibling;
+      const messageBody = textarea.value.trim();
+      if (!messageBody) return alert('Please write a reply.');
+
+      const raw = [
+        `To: ${to}`,
+        `Subject: Re: ${subject}`,
+        '',
+        messageBody
+      ].join('\n');
+
+      const base64EncodedEmail = btoa(raw)
+        .replace(/\+/g, '-')
+        .replace(/\//g, '_')
+        .replace(/=+$/, '');
+
+      fetch('https://gmail.googleapis.com/gmail/v1/users/me/messages/send', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${access_token}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ raw: base64EncodedEmail })
+      })
+      .then(res => res.json())
+      .then(data => {
+        alert('Reply sent!');
+        textarea.value = '';
+      })
+      .catch(err => {
+        console.error('Failed to send reply:', err);
+        alert('Failed to send reply.');
+      });
+    }
+
+    window.onload = function () {
+      if (window.google && google.accounts) {
+        initializeTokenClient();
+      } else {
+        window.setTimeout(() => {
+          if (window.google && google.accounts) {
+            initializeTokenClient();
+          } else {
+            console.error("Google Identity Services SDK failed to load.");
+          }
+        }, 1000);
+      }
+    };
+  </script>
+</body>
+</html>
