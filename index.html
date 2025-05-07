@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <title>Gmail Viewer – Drag & Drop Folders</title>
+  <title>Gmail Viewer – Folder Click & Drag</title>
   <script src="https://accounts.google.com/gsi/client" async defer></script>
   <style>
     body { font-family: Arial, sans-serif; margin: 40px; background-color: #f4f7fa; color: #333; }
@@ -206,11 +206,20 @@
         border-radius: 6px;
         cursor: pointer;
       `;
+
+      // Drag-and-drop
       folder.ondragover = e => e.preventDefault();
       folder.ondrop = e => {
         const threadId = e.dataTransfer.getData("thread-id");
         moveThreadToFolder(threadId, label.id);
       };
+
+      // Click-to-open
+      folder.onclick = () => {
+        document.getElementById('labelFilter').value = `label:${label.name}`;
+        refreshInbox();
+      };
+
       container.appendChild(folder);
     });
   }
@@ -388,10 +397,6 @@
     }
     document.getElementById('backToTop').style.display = window.scrollY > 300 ? 'block' : 'none';
   };
-</script>
-</body>
-</html>
-
 </script>
 </body>
 </html>
