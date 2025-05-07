@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <title>Gmail Viewer – Folder Click & Drag</title>
+  <title>Gmail Viewer – Folder Filtering Fix</title>
   <script src="https://accounts.google.com/gsi/client" async defer></script>
   <style>
     body { font-family: Arial, sans-serif; margin: 40px; background-color: #f4f7fa; color: #333; }
@@ -111,6 +111,7 @@
   let labelList = [];
   let nextPageToken = '';
   let loading = false;
+  let currentLabelId = null;
 
   function formatDate(date) {
     return date.toLocaleString();
@@ -124,7 +125,7 @@
         access_token = response.access_token;
         loadLabels();
         refreshInbox();
-        setInterval(refreshInbox, 120000);
+        setInterval(() => refreshInbox(currentLabelId), 120000);
       },
     });
   }
@@ -207,17 +208,15 @@
         cursor: pointer;
       `;
 
-      // Drag-and-drop
       folder.ondragover = e => e.preventDefault();
       folder.ondrop = e => {
         const threadId = e.dataTransfer.getData("thread-id");
         moveThreadToFolder(threadId, label.id);
       };
 
-      // Click-to-open
       folder.onclick = () => {
-        document.getElementById('labelFilter').value = `label:${label.name}`;
-        refreshInbox();
+        currentLabelId = label.id;
+        refreshInbox(currentLabelId);
       };
 
       container.appendChild(folder);
@@ -238,31 +237,30 @@
     })
     .then(() => {
       alert("Thread moved via drag-and-drop.");
-      refreshInbox();
+      refreshInbox(currentLabelId);
     });
   }
 
   function getTimeQuery() {
     const timeFilter = document.getElementById('timeFilter').value;
-    const labelFilter = document.getElementById('labelFilter').value;
     const searchTerm = document.getElementById('searchInput').value.trim();
     const now = new Date();
     const qParts = [];
     if (timeFilter === '24h') qParts.push('after:' + Math.floor((now.getTime() - 86400000) / 1000));
     if (timeFilter === '7d') qParts.push('after:' + Math.floor((now.getTime() - 604800000) / 1000));
-    if (labelFilter) qParts.push(labelFilter);
     if (searchTerm) qParts.push(searchTerm);
     return qParts.join(' ');
   }
 
-  function refreshInbox() {
+  function refreshInbox(labelIdOverride = null) {
+    currentLabelId = labelIdOverride;
     nextPageToken = '';
     document.getElementById('emails').innerHTML = '';
-    loadInbox();
+    loadInbox(labelIdOverride);
   }
 </script>
 <script>
-  function loadInbox() {
+  function loadInbox(labelIdOverride = null) {
     if (loading) return;
     loading = true;
 
@@ -271,6 +269,7 @@
     url.searchParams.set('maxResults', '10');
     if (query) url.searchParams.set('q', query);
     if (nextPageToken) url.searchParams.set('pageToken', nextPageToken);
+    if (labelIdOverride) url.searchParams.set('labelIds', labelIdOverride);
 
     fetch(url, { headers: { 'Authorization': `Bearer ${access_token}` } })
       .then(res => res.json())
@@ -387,13 +386,13 @@
     })
     .then(() => {
       alert("Thread moved to folder.");
-      refreshInbox();
+      refreshInbox(currentLabelId);
     });
   }
 
   window.onscroll = function () {
     if ((window.innerHeight + window.scrollY) >= document.body.offsetHeight - 50) {
-      loadInbox();
+      loadInbox(currentLabelId);
     }
     document.getElementById('backToTop').style.display = window.scrollY > 300 ? 'block' : 'none';
   };
