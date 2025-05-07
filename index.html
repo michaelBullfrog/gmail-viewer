@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <title>Gmail Viewer – Floating Compose</title>
+  <title>Gmail Viewer – Persistent Login</title>
   <script src="https://accounts.google.com/gsi/client" async defer></script>
   <style>
     body { font-family: Arial, sans-serif; margin: 40px; background-color: #f4f7fa; color: #333; }
@@ -49,6 +49,7 @@
        data-ux_mode="popup"
        data-callback="handleCredentialResponse"
        data-auto_prompt="false"
+       data-auto_select="true"
        data-scope="https://www.googleapis.com/auth/gmail.modify"></div>
 
   <div class="g_id_signin"
