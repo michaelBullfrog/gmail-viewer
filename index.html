@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <title>Gmail Viewer – Persistent Login Fixed</title>
+  <title>Gmail Viewer – Fixed Version</title>
   <script src="https://accounts.google.com/gsi/client" async defer></script>
   <style>
     body { font-family: Arial, sans-serif; margin: 40px; background-color: #f4f7fa; color: #333; }
@@ -125,6 +125,10 @@
   <!-- Floating New Email Button -->
   <button id="composeToggleBtn" onclick="showCompose()"
     style="position:fixed;bottom:30px;right:30px;background:#0073e6;color:white;border:none;
+           border-radius:50%;width:50px;height:50px;font-size:24px;cursor:pointer;
+           box-shadow:0 2px 6px rgba(0,0,0,0.2);display:none;z-index:9999;">
+    +
+  </button>
 <script>
   let access_token = '';
   let tokenClient;
@@ -133,9 +137,12 @@
   let loading = false;
   let currentLabelId = 'INBOX';
 
-  function formatDate(date) {
-    return date.toLocaleString();
-  }
+  // ✅ Fix for "callback not a function"
+  window.handleCredentialResponse = function (response) {
+    const decoded = JSON.parse(atob(response.credential.split('.')[1]));
+    document.body.insertAdjacentHTML('afterbegin', `<p style='text-align:center;'>Welcome, ${decoded.name}</p>`);
+    initializeTokenClient('consent');
+  };
 
   function initializeTokenClient(promptMode = 'consent') {
     tokenClient = google.accounts.oauth2.initTokenClient({
@@ -154,22 +161,14 @@
       },
     });
 
-    // Try silent refresh first
     if (promptMode === 'none') {
       tokenClient.requestAccessToken();
     }
   }
 
-  function handleCredentialResponse(response) {
-    const decoded = JSON.parse(atob(response.credential.split('.')[1]));
-    document.body.insertAdjacentHTML('afterbegin', `<p style='text-align:center;'>Welcome, ${decoded.name}</p>`);
-    initializeTokenClient('consent'); // fallback manual login
-  }
-
   window.onload = function () {
     if (window.google && google.accounts) {
-      // Try silent re-auth on load
-      initializeTokenClient('none');
+      initializeTokenClient('none'); // try silent login
     } else {
       setTimeout(() => {
         if (window.google && google.accounts) {
@@ -178,7 +177,7 @@
       }, 1000);
     }
 
-    // Restore compose window state
+    // Restore compose box state
     const savedState = localStorage.getItem('composeCollapsed');
     const form = document.getElementById('composeForm');
     const toggleBtn = document.querySelector('#composeBox button');
@@ -203,6 +202,7 @@
     localStorage.setItem('composeCollapsed', isCollapsed ? 'false' : 'true');
   }
 
+  // ✅ Fix: define showCompose globally
   function showCompose() {
     const form = document.getElementById('composeForm');
     const toggleBtn = document.querySelector('#composeBox button');
@@ -254,131 +254,6 @@
     .catch(err => {
       console.error(err);
       alert("Error sending email.");
-    });
-  }
-
-  function createFolder() {
-    const folderName = document.getElementById('newFolderInput').value.trim();
-    if (!folderName) {
-      alert("Please enter a folder name.");
-      return;
-    }
-
-    fetch('https://gmail.googleapis.com/gmail/v1/users/me/labels', {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${access_token}`,
-        'Content-Type': 'application/json'
-      },
-      body: JSON.stringify({
-        name: folderName,
-        labelListVisibility: 'labelShow',
-        messageListVisibility: 'show'
-      })
-    })
-    .then(response => response.json())
-    .then(data => {
-      if (data.id) {
-        alert(`Folder "${folderName}" created successfully!`);
-        loadLabels();
-      } else {
-        alert("Failed to create folder.");
-      }
-    })
-    .catch(err => {
-      console.error(err);
-      alert("Error creating folder.");
-    });
-  }
-
-  function loadLabels() {
-    fetch('https://gmail.googleapis.com/gmail/v1/users/me/labels', {
-      headers: { 'Authorization': `Bearer ${access_token}` }
-    })
-    .then(res => res.json())
-    .then(data => {
-      labelList = data.labels.filter(l => l.type === 'user');
-      renderFolderDropTargets();
-    });
-  }
-
-  function renderFolderDropTargets() {
-    const container = document.getElementById("folderList");
-    container.innerHTML = '';
-
-    const inboxBtn = document.createElement('div');
-    inboxBtn.textContent = 'Inbox';
-    inboxBtn.style.cssText = `
-      padding: 10px 15px;
-      background: #0073e6;
-      color: white;
-      border-radius: 6px;
-      cursor: pointer;
-      margin-bottom: 10px;
-    `;
-    inboxBtn.onclick = () => {
-      document.getElementById('labelFilter').value = 'INBOX';
-      currentLabelId = 'INBOX';
-      setActiveFolder(inboxBtn);
-      refreshInbox(currentLabelId);
-    };
-    container.appendChild(inboxBtn);
-
-    labelList.forEach(label => {
-      const folder = document.createElement('div');
-      folder.textContent = label.name;
-      folder.setAttribute('data-label-id', label.id);
-      folder.style.cssText = `
-        padding: 10px 15px;
-        background: #0073e6;
-        color: white;
-        border-radius: 6px;
-        cursor: pointer;
-      `;
-
-      folder.ondragover = e => e.preventDefault();
-      folder.ondrop = e => {
-        const threadId = e.dataTransfer.getData("thread-id");
-        moveThreadToFolder(threadId, label.id);
-      };
-
-      folder.onclick = () => {
-        currentLabelId = label.id;
-        document.getElementById('labelFilter').value = '';
-        setActiveFolder(folder);
-        refreshInbox(currentLabelId);
-      };
-
-      container.appendChild(folder);
-    });
-  }
-
-  function setActiveFolder(selectedDiv) {
-    const allFolders = document.querySelectorAll('#folderList > div');
-    allFolders.forEach(f => f.style.outline = 'none');
-
-    selectedDiv.style.outline = '3px solid #fff';
-    selectedDiv.style.boxShadow = '0 0 0 3px #0073e6';
-
-    const folderTitle = selectedDiv.textContent.trim();
-    document.getElementById('currentFolderName').setAttribute('data-folder-name', folderTitle);
-  }
-
-  function moveThreadToFolder(threadId, labelId) {
-    fetch(`https://gmail.googleapis.com/gmail/v1/users/me/threads/${threadId}/modify`, {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${access_token}`,
-        'Content-Type': 'application/json'
-      },
-      body: JSON.stringify({
-        addLabelIds: [labelId],
-        removeLabelIds: ['INBOX']
-      })
-    })
-    .then(() => {
-      alert("Thread moved to folder.");
-      refreshInbox(currentLabelId);
     });
   }
 </script>
