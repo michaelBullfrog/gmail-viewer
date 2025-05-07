@@ -3,7 +3,6 @@
 <head>
   <meta charset="UTF-8">
   <title>Gmail Viewer – Floating Compose</title>
-  <script src="https://accounts.google.com/gsi/client" async defer></script>
   <style>
     body { font-family: Arial, sans-serif; margin: 40px; background-color: #f4f7fa; color: #333; }
     h1 { text-align: center; margin-bottom: 10px; }
@@ -42,7 +41,19 @@
 <body>
   <h1>My Gmail Inbox</h1>
 
-  <!-- Google Sign-In -->
+  <!-- Google Sign-In callback must be defined before loading the library -->
+  <script>
+    function handleCredentialResponse(response) {
+      const decoded = JSON.parse(atob(response.credential.split('.')[1]));
+      document.body.insertAdjacentHTML(
+        'afterbegin',
+        `<p style="text-align:center;">Welcome, ${decoded.name}</p>`
+      );
+      tokenClient.requestAccessToken();
+    }
+  </script>
+  <script src="https://accounts.google.com/gsi/client" async defer></script>
+
   <div id="g_id_onload"
        data-client_id="474892923870-2r0ksjol93ve88881n7p2glmv7onpd4l.apps.googleusercontent.com"
        data-context="use"
@@ -112,7 +123,7 @@
   ">
     <div style="display:flex;justify-content:space-between;align-items:center;">
       <h3 style="margin:0;">Compose</h3>
-      <button onclick="toggleCompose()" style="background:none;border:none;font-size:16px;cursor:pointer;">➖</button>
+      <button onclick="toggleCompose(event)" style="background:none;border:none;font-size:16px;cursor:pointer;">➖</button>
     </div>
     <div id="composeForm">
       <input id="toEmail" type="email" placeholder="To" style="width:100%;padding:8px;margin:8px 0;" />
@@ -129,6 +140,7 @@
            box-shadow:0 2px 6px rgba(0,0,0,0.2);display:none;z-index:9999;">
     +
   </button>
+
 <script>
   let access_token = '';
   let tokenClient;
@@ -137,409 +149,218 @@
   let loading = false;
   let currentLabelId = 'INBOX';
 
-  function formatDate(date) {
-    return date.toLocaleString();
-  }
-
   function initializeTokenClient() {
     tokenClient = google.accounts.oauth2.initTokenClient({
       client_id: '474892923870-2r0ksjol93ve88881n7p2glmv7onpd4l.apps.googleusercontent.com',
       scope: 'https://www.googleapis.com/auth/gmail.modify',
-      callback: (response) => {
-        access_token = response.access_token;
+      callback: (resp) => {
+        access_token = resp.access_token;
         loadLabels();
         refreshInbox(currentLabelId);
         setInterval(() => refreshInbox(currentLabelId), 120000);
-      },
+      }
     });
   }
 
-  function handleCredentialResponse(response) {
-    const decoded = JSON.parse(atob(response.credential.split('.')[1]));
-    document.body.insertAdjacentHTML('afterbegin', <p style='text-align:center;'>Welcome, ${decoded.name}</p>);
-    tokenClient?.requestAccessToken();
-  }
-
   window.onload = function () {
-    if (window.google && google.accounts) {
-      initializeTokenClient();
-    } else {
-      setTimeout(() => {
-        if (window.google && google.accounts) {
-          initializeTokenClient();
-        }
-      }, 1000);
-    }
+    if (window.google && google.accounts) initializeTokenClient();
+    else setTimeout(() => { if (window.google && google.accounts) initializeTokenClient(); }, 1000);
 
     // Restore compose state
-    const savedState = localStorage.getItem('composeCollapsed');
+    const saved = localStorage.getItem('composeCollapsed');
     const form = document.getElementById('composeForm');
-    const toggleBtn = document.querySelector('#composeBox button');
     const floatingBtn = document.getElementById('composeToggleBtn');
-
-    if (savedState === 'true') {
-      if (form && toggleBtn) {
-        form.style.display = 'none';
-        toggleBtn.textContent = '➕';
-        floatingBtn.style.display = 'block';
-      }
+    if (saved === 'true') {
+      form.style.display = 'none';
+      floatingBtn.style.display = 'block';
     }
   };
 
-  function toggleCompose() {
+  function toggleCompose(e) {
     const form = document.getElementById('composeForm');
-    const toggleBtn = event.target;
-    const isCollapsed = form.style.display === 'none';
-    form.style.display = isCollapsed ? 'block' : 'none';
-    toggleBtn.textContent = isCollapsed ? '➖' : '➕';
-    document.getElementById('composeToggleBtn').style.display = isCollapsed ? 'none' : 'block';
-    localStorage.setItem('composeCollapsed', isCollapsed ? 'false' : 'true');
+    const btn = e.currentTarget;
+    const hidden = form.style.display === 'none';
+    form.style.display = hidden ? 'block' : 'none';
+    btn.textContent = hidden ? '➖' : '➕';
+    document.getElementById('composeToggleBtn').style.display = hidden ? 'none' : 'block';
+    localStorage.setItem('composeCollapsed', hidden ? 'false' : 'true');
   }
 
   function showCompose() {
-    const form = document.getElementById('composeForm');
-    const toggleBtn = document.querySelector('#composeBox button');
-    form.style.display = 'block';
-    toggleBtn.textContent = '➖';
+    document.getElementById('composeForm').style.display = 'block';
+    document.querySelector('#composeBox button').textContent = '➖';
     document.getElementById('composeToggleBtn').style.display = 'none';
     localStorage.setItem('composeCollapsed', 'false');
   }
 
   function sendEmail() {
-    const to = document.getElementById("toEmail").value;
-    const subject = document.getElementById("emailSubject").value;
-    const body = document.getElementById("emailBody").value;
-
-    if (!to || !subject || !body) {
-      alert("Please fill in all fields.");
-      return;
-    }
-
-    const message =
-      To: ${to}\r\n +
-      Subject: ${subject}\r\n +
-      Content-Type: text/plain; charset="UTF-8"\r\n +
-      \r\n${body};
-
-    const encodedMessage = btoa(message)
-      .replace(/\+/g, '-')
-      .replace(/\//g, '_')
-      .replace(/=+$/, '');
-
+    const to = document.getElementById('toEmail').value;
+    const subject = document.getElementById('emailSubject').value;
+    const body = document.getElementById('emailBody').value;
+    if (!to || !subject || !body) { alert('Please fill in all fields.'); return; }
+    const msg = `To: ${to}\r\nSubject: ${subject}\r\nContent-Type: text/plain; charset="UTF-8"\r\n\r\n${body}`;
+    const raw = btoa(msg).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
     fetch('https://gmail.googleapis.com/gmail/v1/users/me/messages/send', {
       method: 'POST',
-      headers: {
-        'Authorization': Bearer ${access_token},
-        'Content-Type': 'application/json'
-      },
-      body: JSON.stringify({ raw: encodedMessage })
+      headers: { 'Authorization': `Bearer ${access_token}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ raw })
     })
-    .then(res => {
-      if (res.ok) {
-        alert("Email sent!");
-        document.getElementById("toEmail").value = '';
-        document.getElementById("emailSubject").value = '';
-        document.getElementById("emailBody").value = '';
-      } else {
-        alert("Failed to send email.");
-      }
-    })
-    .catch(err => {
-      console.error(err);
-      alert("Error sending email.");
-    });
+    .then(r => r.ok ? alert('Email sent!') : alert('Failed to send email.'))
+    .catch(() => alert('Error sending email.'));
   }
 
   function createFolder() {
-    const folderName = document.getElementById('newFolderInput').value.trim();
-    if (!folderName) {
-      alert("Please enter a folder name.");
-      return;
-    }
-
+    const name = document.getElementById('newFolderInput').value.trim();
+    if (!name) { alert('Please enter a folder name.'); return; }
     fetch('https://gmail.googleapis.com/gmail/v1/users/me/labels', {
       method: 'POST',
-      headers: {
-        'Authorization': Bearer ${access_token},
-        'Content-Type': 'application/json'
-      },
-      body: JSON.stringify({
-        name: folderName,
-        labelListVisibility: 'labelShow',
-        messageListVisibility: 'show'
-      })
+      headers: { 'Authorization': `Bearer ${access_token}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ name, labelListVisibility:'labelShow', messageListVisibility:'show' })
     })
-    .then(response => response.json())
-    .then(data => {
-      if (data.id) {
-        alert(Folder "${folderName}" created successfully!);
-        loadLabels();
-      } else {
-        alert("Failed to create folder.");
-      }
-    })
-    .catch(err => {
-      console.error(err);
-      alert("Error creating folder.");
-    });
+    .then(res => res.json())
+    .then(data => data.id ? (alert(`Folder "${name}" created!`), loadLabels()) : alert('Failed to create folder.'))
+    .catch(() => alert('Error creating folder.'));
   }
 
   function loadLabels() {
-    fetch('https://gmail.googleapis.com/gmail/v1/users/me/labels', {
-      headers: { 'Authorization': Bearer ${access_token} }
-    })
-    .then(res => res.json())
-    .then(data => {
-      labelList = data.labels.filter(l => l.type === 'user');
-      renderFolderDropTargets();
-    });
+    fetch('https://gmail.googleapis.com/gmail/v1/users/me/labels', { headers:{ 'Authorization': `Bearer ${access_token}` } })
+      .then(r=>r.json()).then(d=>{
+        labelList = d.labels.filter(l=>l.type==='user');
+        renderFolderDropTargets();
+      });
   }
 
   function renderFolderDropTargets() {
-    const container = document.getElementById("folderList");
-    container.innerHTML = '';
-
-    const inboxBtn = document.createElement('div');
-    inboxBtn.textContent = 'Inbox';
-    inboxBtn.style.cssText = 
-      padding: 10px 15px;
-      background: #0073e6;
-      color: white;
-      border-radius: 6px;
-      cursor: pointer;
-      margin-bottom: 10px;
-    ;
-    inboxBtn.onclick = () => {
-      document.getElementById('labelFilter').value = 'INBOX';
-      currentLabelId = 'INBOX';
-      setActiveFolder(inboxBtn);
-      refreshInbox(currentLabelId);
+    const c = document.getElementById('folderList');
+    c.innerHTML = '';
+    const mkBtn = (text, id)=>{
+      const d = document.createElement('div');
+      d.textContent = text;
+      d.setAttribute('data-label-id', id || 'INBOX');
+      d.style.cssText = `padding:10px 15px; background:#0073e6; color:white; border-radius:6px; cursor:pointer; margin-bottom:10px;`;
+      d.ondragover = e=>e.preventDefault();
+      d.ondrop = e=>{ const tid=e.dataTransfer.getData('thread-id'); moveThreadToFolder(tid,id); };
+      d.onclick = ()=>{ currentLabelId = id||'INBOX'; setActiveFolder(d); refreshInbox(currentLabelId); };
+      return d;
     };
-    container.appendChild(inboxBtn);
-
-    labelList.forEach(label => {
-      const folder = document.createElement('div');
-      folder.textContent = label.name;
-      folder.setAttribute('data-label-id', label.id);
-      folder.style.cssText = 
-        padding: 10px 15px;
-        background: #0073e6;
-        color: white;
-        border-radius: 6px;
-        cursor: pointer;
-      ;
-
-      folder.ondragover = e => e.preventDefault();
-      folder.ondrop = e => {
-        const threadId = e.dataTransfer.getData("thread-id");
-        moveThreadToFolder(threadId, label.id);
-      };
-
-      folder.onclick = () => {
-        currentLabelId = label.id;
-        document.getElementById('labelFilter').value = '';
-        setActiveFolder(folder);
-        refreshInbox(currentLabelId);
-      };
-
-      container.appendChild(folder);
-    });
+    c.appendChild(mkBtn('Inbox', 'INBOX'));
+    labelList.forEach(l=>c.appendChild(mkBtn(l.name,l.id)));
   }
 
-  function setActiveFolder(selectedDiv) {
-    const allFolders = document.querySelectorAll('#folderList > div');
-    allFolders.forEach(f => f.style.outline = 'none');
-
-    selectedDiv.style.outline = '3px solid #fff';
-    selectedDiv.style.boxShadow = '0 0 0 3px #0073e6';
-
-    const folderTitle = selectedDiv.textContent.trim();
-    document.getElementById('currentFolderName').setAttribute('data-folder-name', folderTitle);
+  function setActiveFolder(el) {
+    document.querySelectorAll('#folderList > div').forEach(d=>d.style.outline='none');
+    el.style.outline='3px solid #fff'; el.style.boxShadow='0 0 0 3px #0073e6';
+    document.getElementById('currentFolderName').textContent = el.textContent.trim();
   }
 
-  function moveThreadToFolder(threadId, labelId) {
-    fetch(https://gmail.googleapis.com/gmail/v1/users/me/threads/${threadId}/modify, {
-      method: 'POST',
-      headers: {
-        'Authorization': Bearer ${access_token},
-        'Content-Type': 'application/json'
-      },
-      body: JSON.stringify({
-        addLabelIds: [labelId],
-        removeLabelIds: ['INBOX']
-      })
-    })
-    .then(() => {
-      alert("Thread moved to folder.");
-      refreshInbox(currentLabelId);
-    });
-  }
-</script>
-<script>
   function getTimeQuery() {
-    const timeFilter = document.getElementById('timeFilter').value;
-    const searchTerm = document.getElementById('searchInput').value.trim();
-    const now = new Date();
-    const qParts = [];
-    if (timeFilter === '24h') qParts.push('after:' + Math.floor((now.getTime() - 86400000) / 1000));
-    if (timeFilter === '7d') qParts.push('after:' + Math.floor((now.getTime() - 604800000) / 1000));
-    if (searchTerm) qParts.push(searchTerm);
-    return qParts.join(' ');
+    const tf = document.getElementById('timeFilter').value;
+    const s = document.getElementById('searchInput').value.trim();
+    const now = Date.now();
+    const parts = [];
+    if(tf==='24h') parts.push('after:'+ Math.floor((now-86400000)/1000));
+    if(tf==='7d') parts.push('after:'+ Math.floor((now-604800000)/1000));
+    if(s) parts.push(s);
+    return parts.join(' ');
   }
 
-  function refreshInbox(labelIdOverride = null) {
-    currentLabelId = labelIdOverride || currentLabelId;
-    nextPageToken = '';
-    document.getElementById('emails').innerHTML = '';
-    loadInbox(currentLabelId);
+  function refreshInbox(labelId) {
+    currentLabelId=labelId||currentLabelId; nextPageToken=''; document.getElementById('emails').innerHTML=''; loadInbox();
   }
 
-  function loadInbox(labelIdOverride = null) {
-    if (loading) return;
-    loading = true;
+  function loadInbox() {
+    if (loading) return; loading=true;
+    const q=getTimeQuery();
+    const url=new URL('https://gmail.googleapis.com/gmail/v1/users/me/threads');
+    url.searchParams.set('maxResults','10'); if(q) url.searchParams.set('q',q);
+    if(nextPageToken) url.searchParams.set('pageToken',nextPageToken);
+    if(currentLabelId && currentLabelId!=='all') url.searchParams.set('labelIds',currentLabelId);
 
-    const query = getTimeQuery();
-    const url = new URL('https://gmail.googleapis.com/gmail/v1/users/me/threads');
-    url.searchParams.set('maxResults', '10');
-    if (query) url.searchParams.set('q', query);
-    if (nextPageToken) url.searchParams.set('pageToken', nextPageToken);
-    if (labelIdOverride && labelIdOverride !== 'all') {
-      url.searchParams.set('labelIds', labelIdOverride);
-    }
-
-    fetch(url, { headers: { 'Authorization': Bearer ${access_token} } })
-      .then(res => res.json())
-      .then(data => {
-        loading = false;
-        if (!data.threads) return;
-        nextPageToken = data.nextPageToken || '';
-        const list = document.getElementById('emails');
-
-        Promise.all(
-          data.threads.map(t =>
-            fetch(https://gmail.googleapis.com/gmail/v1/users/me/threads/${t.id}, {
-              headers: { 'Authorization': Bearer ${access_token} }
-            }).then(res => res.json())
-          )
-        ).then(fullThreads => {
-          const sorted = fullThreads.sort((a, b) => {
-            const bDate = parseInt(b.messages[b.messages.length - 1].internalDate);
-            const aDate = parseInt(a.messages[a.messages.length - 1].internalDate);
-            return bDate - aDate;
-          });
-
-          sorted.forEach(fullThread => {
-            const item = document.createElement('li');
-            item.setAttribute('data-thread-id', fullThread.id);
-            item.setAttribute('draggable', true);
-            item.ondragstart = e => e.dataTransfer.setData("thread-id", fullThread.id);
-
-            const messages = fullThread.messages.sort((a, b) => parseInt(b.internalDate) - parseInt(a.internalDate));
-            const newestMsg = messages[0];
-            const subject = newestMsg.payload.headers.find(h => h.name === 'Subject')?.value || '(No Subject)';
-            const newestDate = formatDate(new Date(parseInt(newestMsg.internalDate)));
-            const first = messages[0];
-            const isUnread = first.labelIds?.includes("UNREAD");
-            const newBadge = isUnread ? <span class="new-badge">NEW</span> : '';
-
-            let threadHtml = '';
-            messages.forEach(m => {
-              const from = m.payload.headers.find(h => h.name === 'From')?.value || '(Unknown)';
-              const date = formatDate(new Date(parseInt(m.internalDate)));
-              const part = m.payload.parts?.find(p => p.mimeType === 'text/plain') || m.payload;
-              const body = part.body.data ? atob(part.body.data.replace(/-/g, '+').replace(/_/g, '/')) : '(No body)';
-              threadHtml += 
-                <div class="thread-body">
-                  <div class="meta">From: ${from}<br>Date: ${date}</div>
-                  <div class="email-body">${body}</div>
-                </div>;
-            });
-
-            const labelDropdown = labelList.map(label =>
-              <option value="${label.id}">${label.name}</option>).join('');
-
-            item.innerHTML = 
-              <div class="subject${isUnread ? '' : ' read'}" onclick="toggleThread(this)">
-                ${subject}${newBadge}
-                <span style="float:right; font-size:0.85em; color:#666;">${newestDate}</span>
-              </div>
-
-              <div style="margin-top: 10px;">
-                <label>Move to Folder:</label>
-                <select onchange="labelThread(this, '${fullThread.id}')">
-                  <option value="">Select folder</option>
-                  ${labelDropdown}
-                </select>
-              </div>
-
-              <div class="thread-container">
-                ${threadHtml}
-              </div>;
-            list.appendChild(item);
-          });
-
-          const headingEl = document.getElementById('currentFolderName');
-          const baseName = headingEl.getAttribute('data-folder-name') || 'Inbox';
-          const unreadCount = fullThreads.reduce((sum, thread) => {
-            const newest = thread.messages[0];
-            return sum + (newest.labelIds?.includes('UNREAD') ? 1 : 0);
-          }, 0);
-
-          headingEl.textContent = ${baseName} (${fullThreads.length} messages${unreadCount > 0 ? , ${unreadCount} unread : ''});
-        });
-      });
-  }
-
-  function toggleThread(subjectDiv) {
-    const container = subjectDiv.nextElementSibling?.nextElementSibling;
-    const isHidden = container?.style.display === 'none';
-    if (container) {
-      container.style.display = isHidden ? 'block' : 'none';
-    }
-
-    subjectDiv.classList.add('read');
-    const badge = subjectDiv.querySelector('.new-badge');
-    if (badge) badge.remove();
-
-    const threadId = subjectDiv.closest('li')?.dataset.threadId;
-    if (threadId) {
-      fetch(https://gmail.googleapis.com/gmail/v1/users/me/threads/${threadId}/modify, {
-        method: 'POST',
-        headers: {
-          'Authorization': Bearer ${access_token},
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({ removeLabelIds: ['UNREAD'] })
-      });
-    }
-  }
-
-  function labelThread(selectElem, threadId) {
-    const labelId = selectElem.value;
-    if (!labelId) return;
-
-    fetch(https://gmail.googleapis.com/gmail/v1/users/me/threads/${threadId}/modify, {
-      method: 'POST',
-      headers: {
-        'Authorization': Bearer ${access_token},
-        'Content-Type': 'application/json'
-      },
-      body: JSON.stringify({
-        addLabelIds: [labelId],
-        removeLabelIds: ['INBOX']
+    fetch(url, { headers:{ 'Authorization': `Bearer ${access_token}` } })
+      .then(r=>r.json()).then(d=>{
+        loading=false; if(!d.threads) return;
+        nextPageToken = d.nextPageToken||'';
+        return Promise.all(d.threads.map(t=>
+          fetch(`https://gmail.googleapis.com/gmail/v1/users/me/threads/${t.id}`,
+            { headers:{ 'Authorization': `Bearer ${access_token}` } }
+          ).then(r=>r.json())
+        ));
       })
-    })
-    .then(() => {
-      alert("Thread moved to folder.");
-      refreshInbox(currentLabelId);
+      .then(threads=>{
+        const sorted = threads.sort((a,b)=>(parseInt(b.messages.slice(-1)[0].internalDate) - parseInt(a.messages.slice(-1)[0].internalDate)));
+        const list = document.getElementById('emails');
+        sorted.forEach(th=>{
+          const item = document.createElement('li');
+          item.setAttribute('data-thread-id', th.id);
+          item.setAttribute('draggable', true);
+          item.ondragstart = e=> e.dataTransfer.setData('thread-id', th.id);
+
+          const msgs = th.messages.sort((a,b)=>parseInt(b.internalDate)-parseInt(a.internalDate));
+          const newest = msgs[0];
+          const subj = newest.payload.headers.find(h=>h.name==='Subject')?.value || '(No Subject)';
+          const isUnread = newest.labelIds?.includes('UNREAD');
+          const badge = isUnread ? `<span class="new-badge">NEW</span>` : '';
+
+          let threadHtml = '';
+          msgs.forEach(m=>{
+            const from = m.payload.headers.find(h=>h.name==='From')?.value; 
+            const date = new Date(parseInt(m.internalDate)).toLocaleString();
+            const part = m.payload.parts?.find(p=>p.mimeType==='text/plain')||m.payload;
+            const body = part.body.data ? atob(part.body.data.replace(/-/g,'+').replace(/_/g,'/')) : '(No body)';
+            threadHtml +=
+              `<div class="thread-body">
+                <div class="meta">From: ${from}<br>Date: ${date}</div>
+                <div class="email-body">${body}</div>
+              </div>`;
+          });
+
+          const options = labelList.map(l=>`<option value="${l.id}">${l.name}</option>`).join('');
+
+          item.innerHTML =
+            `<div class="subject${isUnread?'':' read'}" onclick="toggleThread(this)">
+               ${subj}${badge}
+               <span style="float:right; font-size:0.85em; color:#666;">${new Date(parseInt(newest.internalDate)).toLocaleString()}</span>
+             </div>
+             <div style="margin-top:10px;">
+               <label>Move to Folder:</label>
+               <select onchange="labelThread(this,'${th.id}')">
+                 <option value="">Select folder</option>
+                 ${options}
+               </select>
+             </div>
+             <div class="thread-container">
+               ${threadHtml}
+             </div>`;
+          list.appendChild(item);
+        });
+        const h2 = document.getElementById('currentFolderName');
+        h2.textContent = `${h2.getAttribute('data-folder-name')} (${sorted.length} msgs${sorted.filter(t=>t.messages[0].labelIds?.includes('UNREAD')).length>0?`, ${sorted.filter(t=>t.messages[0].labelIds?.includes('UNREAD')).length} unread`:''})`;
+      });
+  }
+
+  function toggleThread(el) {
+    const container = el.parentElement.querySelector('.thread-container');
+    if (container) container.style.display = container.style.display==='none'?'block':'none';
+    el.classList.add('read');
+    const badge = el.querySelector('.new-badge'); if (badge) badge.remove();
+    const tid = el.closest('li').dataset.threadId;
+    fetch(`https://gmail.googleapis.com/gmail/v1/users/me/threads/${tid}/modify`, {
+      method:'POST', headers:{ 'Authorization':`Bearer ${access_token}`, 'Content-Type':'application/json' },
+      body:JSON.stringify({ removeLabelIds:['UNREAD'] })
     });
   }
 
-  window.onscroll = function () {
-    if ((window.innerHeight + window.scrollY) >= document.body.offsetHeight - 50) {
-      loadInbox(currentLabelId);
-    }
-    document.getElementById('backToTop').style.display = window.scrollY > 300 ? 'block' : 'none';
+  function labelThread(sel, tid) {
+    const lid = sel.value; if(!lid) return;
+    fetch(`https://gmail.googleapis.com/gmail/v1/users/me/threads/${tid}/modify`, {
+      method:'POST', headers:{ 'Authorization':`Bearer ${access_token}`, 'Content-Type':'application/json' },
+      body:JSON.stringify({ addLabelIds:[lid], removeLabelIds:['INBOX'] })
+    }).then(()=> refreshInbox(currentLabelId));
+  }
+
+  window.onscroll = function() {
+    if (window.innerHeight + window.scrollY >= document.body.offsetHeight - 50) loadInbox();
+    document.getElementById('backToTop').style.display = window.scrollY>300?'block':'none';
   };
 </script>
 </body>
