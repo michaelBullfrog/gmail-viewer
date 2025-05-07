@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <title>Gmail Viewer – With Compose</title>
+  <title>Gmail Viewer – Folder & Compose Support</title>
   <script src="https://accounts.google.com/gsi/client" async defer></script>
   <style>
     body { font-family: Arial, sans-serif; margin: 40px; background-color: #f4f7fa; color: #333; }
@@ -28,9 +28,7 @@
     .thread-body {
       margin-top: 15px; padding-left: 15px; border-left: 3px solid #ccc;
     }
-    .thread-container {
-      display: none;
-    }
+    .thread-container { display: none; }
     .reply-box input, .reply-box textarea {
       width: 100%; padding: 8px; margin-top: 5px;
       border-radius: 5px; border: 1px solid #ccc; font-size: 0.95em;
@@ -103,6 +101,7 @@
     </div>
   </div>
 
+  <h2 id="currentFolderName" style="text-align:center; color:#0073e6; margin-bottom:20px;" data-folder-name="Inbox">Inbox</h2>
   <ul id="emails"></ul>
   <button id="backToTop" onclick="window.scrollTo({top: 0, behavior: 'smooth'})">Back to Top</button>
 
@@ -210,7 +209,7 @@
     inboxBtn.textContent = 'Inbox';
     inboxBtn.style.cssText = `
       padding: 10px 15px;
-      background: #444;
+      background: #0073e6;
       color: white;
       border-radius: 6px;
       cursor: pointer;
@@ -219,6 +218,7 @@
     inboxBtn.onclick = () => {
       document.getElementById('labelFilter').value = 'INBOX';
       currentLabelId = 'INBOX';
+      setActiveFolder(inboxBtn);
       refreshInbox(currentLabelId);
     };
     container.appendChild(inboxBtn);
@@ -244,6 +244,7 @@
       folder.onclick = () => {
         currentLabelId = label.id;
         document.getElementById('labelFilter').value = '';
+        setActiveFolder(folder);
         refreshInbox(currentLabelId);
       };
 
@@ -251,40 +252,15 @@
     });
   }
 
-  function moveThreadToFolder(threadId, labelId) {
-    fetch(`https://gmail.googleapis.com/gmail/v1/users/me/threads/${threadId}/modify`, {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${access_token}`,
-        'Content-Type': 'application/json'
-      },
-      body: JSON.stringify({
-        addLabelIds: [labelId],
-        removeLabelIds: ['INBOX']
-      })
-    })
-    .then(() => {
-      alert("Thread moved to folder.");
-      refreshInbox(currentLabelId);
-    });
-  }
+  function setActiveFolder(selectedDiv) {
+    const allFolders = document.querySelectorAll('#folderList > div');
+    allFolders.forEach(f => f.style.outline = 'none');
 
-  function getTimeQuery() {
-    const timeFilter = document.getElementById('timeFilter').value;
-    const searchTerm = document.getElementById('searchInput').value.trim();
-    const now = new Date();
-    const qParts = [];
-    if (timeFilter === '24h') qParts.push('after:' + Math.floor((now.getTime() - 86400000) / 1000));
-    if (timeFilter === '7d') qParts.push('after:' + Math.floor((now.getTime() - 604800000) / 1000));
-    if (searchTerm) qParts.push(searchTerm);
-    return qParts.join(' ');
-  }
+    selectedDiv.style.outline = '3px solid #fff';
+    selectedDiv.style.boxShadow = '0 0 0 3px #0073e6';
 
-  function refreshInbox(labelIdOverride = null) {
-    currentLabelId = labelIdOverride;
-    nextPageToken = '';
-    document.getElementById('emails').innerHTML = '';
-    loadInbox(labelIdOverride);
+    const folderTitle = selectedDiv.textContent.trim();
+    document.getElementById('currentFolderName').setAttribute('data-folder-name', folderTitle);
   }
 
   function sendEmail() {
@@ -414,6 +390,16 @@
               </div>`;
             list.appendChild(item);
           });
+
+          // Update folder heading with count
+          const headingEl = document.getElementById('currentFolderName');
+          const baseName = headingEl.getAttribute('data-folder-name') || 'Inbox';
+          const unreadCount = fullThreads.reduce((sum, thread) => {
+            const newest = thread.messages[0];
+            return sum + (newest.labelIds?.includes('UNREAD') ? 1 : 0);
+          }, 0);
+
+          headingEl.textContent = `${baseName} (${fullThreads.length} messages${unreadCount > 0 ? `, ${unreadCount} unread` : ''})`;
         });
       });
   }
