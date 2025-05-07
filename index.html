@@ -2,7 +2,9 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <title>Gmail Viewer – Fixed Version</title>
+  <meta http-equiv="Cross-Origin-Opener-Policy" content="same-origin">
+  <meta http-equiv="Cross-Origin-Embedder-Policy" content="require-corp">
+  <title>Gmail Viewer – Secure</title>
   <script src="https://accounts.google.com/gsi/client" async defer></script>
   <style>
     body { font-family: Arial, sans-serif; margin: 40px; background-color: #f4f7fa; color: #333; }
@@ -89,46 +91,6 @@
       <div id="folderList" style="display:flex; flex-wrap:wrap; justify-content:center; gap:10px;"></div>
     </div>
   </div>
-
-  <!-- Folder Title -->
-  <h2 id="currentFolderName" style="text-align:center; color:#0073e6; margin-bottom:20px;" data-folder-name="Inbox">Inbox</h2>
-
-  <!-- Emails -->
-  <ul id="emails"></ul>
-  <button id="backToTop" onclick="window.scrollTo({top: 0, behavior: 'smooth'})">Back to Top</button>
-
-  <!-- Floating Compose Panel -->
-  <div id="composeBox" style="
-    position: fixed;
-    top: 40px;
-    right: 40px;
-    width: 300px;
-    background: #fff;
-    border: 1px solid #ccc;
-    border-radius: 10px;
-    padding: 15px;
-    box-shadow: 0 0 10px rgba(0,0,0,0.1);
-    z-index: 9999;
-  ">
-    <div style="display:flex;justify-content:space-between;align-items:center;">
-      <h3 style="margin:0;">Compose</h3>
-      <button onclick="toggleCompose()" style="background:none;border:none;font-size:16px;cursor:pointer;">➖</button>
-    </div>
-    <div id="composeForm">
-      <input id="toEmail" type="email" placeholder="To" style="width:100%;padding:8px;margin:8px 0;" />
-      <input id="emailSubject" type="text" placeholder="Subject" style="width:100%;padding:8px;margin:8px 0;" />
-      <textarea id="emailBody" placeholder="Message..." style="width:100%;padding:8px;height:100px;"></textarea>
-      <button onclick="sendEmail()" style="margin-top:10px;padding:8px 16px;background:#0073e6;color:white;border:none;border-radius:5px;cursor:pointer;">Send</button>
-    </div>
-  </div>
-
-  <!-- Floating New Email Button -->
-  <button id="composeToggleBtn" onclick="showCompose()"
-    style="position:fixed;bottom:30px;right:30px;background:#0073e6;color:white;border:none;
-           border-radius:50%;width:50px;height:50px;font-size:24px;cursor:pointer;
-           box-shadow:0 2px 6px rgba(0,0,0,0.2);display:none;z-index:9999;">
-    +
-  </button>
 <script>
   let access_token = '';
   let tokenClient;
@@ -161,6 +123,7 @@
       },
     });
 
+    // Try silent refresh first
     if (promptMode === 'none') {
       tokenClient.requestAccessToken();
     }
@@ -202,7 +165,6 @@
     localStorage.setItem('composeCollapsed', isCollapsed ? 'false' : 'true');
   }
 
-  // ✅ Fix: define showCompose globally
   function showCompose() {
     const form = document.getElementById('composeForm');
     const toggleBtn = document.querySelector('#composeBox button');
@@ -258,190 +220,130 @@
   }
 </script>
 <script>
-  function getTimeQuery() {
-    const timeFilter = document.getElementById('timeFilter').value;
-    const searchTerm = document.getElementById('searchInput').value.trim();
-    const now = new Date();
-    const qParts = [];
-    if (timeFilter === '24h') qParts.push('after:' + Math.floor((now.getTime() - 86400000) / 1000));
-    if (timeFilter === '7d') qParts.push('after:' + Math.floor((now.getTime() - 604800000) / 1000));
-    if (searchTerm) qParts.push(searchTerm);
-    return qParts.join(' ');
-  }
+  let access_token = '';
+  let tokenClient;
+  let labelList = [];
+  let nextPageToken = '';
+  let loading = false;
+  let currentLabelId = 'INBOX';
 
-  function refreshInbox(labelIdOverride = null) {
-    currentLabelId = labelIdOverride || currentLabelId;
-    nextPageToken = '';
-    document.getElementById('emails').innerHTML = '';
-    loadInbox(currentLabelId);
-  }
+  // ✅ Fix for "callback not a function"
+  window.handleCredentialResponse = function (response) {
+    const decoded = JSON.parse(atob(response.credential.split('.')[1]));
+    document.body.insertAdjacentHTML('afterbegin', `<p style='text-align:center;'>Welcome, ${decoded.name}</p>`);
+    initializeTokenClient('consent');
+  };
 
-  function loadInbox(labelIdOverride = null) {
-    if (loading) return;
-    loading = true;
+  function initializeTokenClient(promptMode = 'consent') {
+    tokenClient = google.accounts.oauth2.initTokenClient({
+      client_id: '474892923870-2r0ksjol93ve88881n7p2glmv7onpd4l.apps.googleusercontent.com',
+      scope: 'https://www.googleapis.com/auth/gmail.modify',
+      prompt: promptMode,
+      callback: (response) => {
+        if (response && response.access_token) {
+          access_token = response.access_token;
+          loadLabels();
+          refreshInbox(currentLabelId);
+          setInterval(() => refreshInbox(currentLabelId), 120000);
+        } else {
+          console.warn('No access token retrieved');
+        }
+      },
+    });
 
-    const query = getTimeQuery();
-    const url = new URL('https://gmail.googleapis.com/gmail/v1/users/me/threads');
-    url.searchParams.set('maxResults', '10');
-    if (query) url.searchParams.set('q', query);
-    if (nextPageToken) url.searchParams.set('pageToken', nextPageToken);
-    if (labelIdOverride && labelIdOverride !== 'all') {
-      url.searchParams.set('labelIds', labelIdOverride);
-    }
-
-    fetch(url, { headers: { 'Authorization': `Bearer ${access_token}` } })
-      .then(res => res.json())
-      .then(data => {
-        loading = false;
-        if (!data.threads) return;
-        nextPageToken = data.nextPageToken || '';
-        const list = document.getElementById('emails');
-
-        Promise.all(
-          data.threads.map(t =>
-            fetch(`https://gmail.googleapis.com/gmail/v1/users/me/threads/${t.id}`, {
-              headers: { 'Authorization': `Bearer ${access_token}` }
-            }).then(res => res.json())
-          )
-        ).then(fullThreads => {
-          const sorted = fullThreads.sort((a, b) => {
-            const bDate = parseInt(b.messages[b.messages.length - 1].internalDate);
-            const aDate = parseInt(a.messages[a.messages.length - 1].internalDate);
-            return bDate - aDate;
-          });
-
-          sorted.forEach(fullThread => {
-            const item = document.createElement('li');
-            item.setAttribute('data-thread-id', fullThread.id);
-            item.setAttribute('draggable', true);
-            item.ondragstart = e => e.dataTransfer.setData("thread-id", fullThread.id);
-
-            const messages = fullThread.messages.sort((a, b) => parseInt(b.internalDate) - parseInt(a.internalDate));
-            const newestMsg = messages[0];
-            const subject = newestMsg.payload.headers.find(h => h.name === 'Subject')?.value || '(No Subject)';
-            const newestDate = formatDate(new Date(parseInt(newestMsg.internalDate)));
-            const first = messages[0];
-            const isUnread = first.labelIds?.includes("UNREAD");
-            const newBadge = isUnread ? `<span class="new-badge">NEW</span>` : '';
-
-            let threadHtml = '';
-
-            const escapeHtml = (unsafe) =>
-              unsafe.replace(/&/g, "&amp;")
-                    .replace(/</g, "&lt;")
-                    .replace(/>/g, "&gt;")
-                    .replace(/"/g, "&quot;")
-                    .replace(/'/g, "&#039;");
-
-            messages.forEach(m => {
-              const from = m.payload.headers.find(h => h.name === 'From')?.value || '(Unknown)';
-              const date = formatDate(new Date(parseInt(m.internalDate)));
-
-              let part = m.payload.parts?.find(p => p.mimeType === 'text/html')
-                       || m.payload.parts?.find(p => p.mimeType === 'text/plain')
-                       || m.payload;
-
-              let raw = part.body?.data
-                ? atob(part.body.data.replace(/-/g, '+').replace(/_/g, '/'))
-                : '(No body)';
-
-              const body = part.mimeType === 'text/html'
-                ? raw
-                : `<pre>${escapeHtml(raw)}</pre>`;
-
-              threadHtml += `
-                <div class="thread-body">
-                  <div class="meta">From: ${from}<br>Date: ${date}</div>
-                  <div class="email-body">${body}</div>
-                </div>`;
-            });
-
-            const labelDropdown = labelList.map(label =>
-              `<option value="${label.id}">${label.name}</option>`).join('');
-
-            item.innerHTML = `
-              <div class="subject${isUnread ? '' : ' read'}" onclick="toggleThread(this)">
-                ${subject}${newBadge}
-                <span style="float:right; font-size:0.85em; color:#666;">${newestDate}</span>
-              </div>
-
-              <div style="margin-top: 10px;">
-                <label>Move to Folder:</label>
-                <select onchange="labelThread(this, '${fullThread.id}')">
-                  <option value="">Select folder</option>
-                  ${labelDropdown}
-                </select>
-              </div>
-
-              <div class="thread-container">
-                ${threadHtml}
-              </div>`;
-            list.appendChild(item);
-          });
-
-          const headingEl = document.getElementById('currentFolderName');
-          const baseName = headingEl.getAttribute('data-folder-name') || 'Inbox';
-          const unreadCount = fullThreads.reduce((sum, thread) => {
-            const newest = thread.messages[0];
-            return sum + (newest.labelIds?.includes('UNREAD') ? 1 : 0);
-          }, 0);
-
-          headingEl.textContent = `${baseName} (${fullThreads.length} messages${unreadCount > 0 ? `, ${unreadCount} unread` : ''})`;
-        });
-      });
-  }
-
-  function toggleThread(subjectDiv) {
-    const container = subjectDiv.nextElementSibling?.nextElementSibling;
-    const isHidden = container?.style.display === 'none';
-    if (container) {
-      container.style.display = isHidden ? 'block' : 'none';
-    }
-
-    subjectDiv.classList.add('read');
-    const badge = subjectDiv.querySelector('.new-badge');
-    if (badge) badge.remove();
-
-    const threadId = subjectDiv.closest('li')?.dataset.threadId;
-    if (threadId) {
-      fetch(`https://gmail.googleapis.com/gmail/v1/users/me/threads/${threadId}/modify`, {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${access_token}`,
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({ removeLabelIds: ['UNREAD'] })
-      });
+    // Try silent refresh first
+    if (promptMode === 'none') {
+      tokenClient.requestAccessToken();
     }
   }
 
-  function labelThread(selectElem, threadId) {
-    const labelId = selectElem.value;
-    if (!labelId) return;
+  window.onload = function () {
+    if (window.google && google.accounts) {
+      initializeTokenClient('none'); // try silent login
+    } else {
+      setTimeout(() => {
+        if (window.google && google.accounts) {
+          initializeTokenClient('none');
+        }
+      }, 1000);
+    }
 
-    fetch(`https://gmail.googleapis.com/gmail/v1/users/me/threads/${threadId}/modify`, {
+    // Restore compose box state
+    const savedState = localStorage.getItem('composeCollapsed');
+    const form = document.getElementById('composeForm');
+    const toggleBtn = document.querySelector('#composeBox button');
+    const floatingBtn = document.getElementById('composeToggleBtn');
+
+    if (savedState === 'true') {
+      if (form && toggleBtn) {
+        form.style.display = 'none';
+        toggleBtn.textContent = '➕';
+        floatingBtn.style.display = 'block';
+      }
+    }
+  };
+
+  function toggleCompose() {
+    const form = document.getElementById('composeForm');
+    const toggleBtn = event.target;
+    const isCollapsed = form.style.display === 'none';
+    form.style.display = isCollapsed ? 'block' : 'none';
+    toggleBtn.textContent = isCollapsed ? '➖' : '➕';
+    document.getElementById('composeToggleBtn').style.display = isCollapsed ? 'none' : 'block';
+    localStorage.setItem('composeCollapsed', isCollapsed ? 'false' : 'true');
+  }
+
+  function showCompose() {
+    const form = document.getElementById('composeForm');
+    const toggleBtn = document.querySelector('#composeBox button');
+    form.style.display = 'block';
+    toggleBtn.textContent = '➖';
+    document.getElementById('composeToggleBtn').style.display = 'none';
+    localStorage.setItem('composeCollapsed', 'false');
+  }
+
+  function sendEmail() {
+    const to = document.getElementById("toEmail").value;
+    const subject = document.getElementById("emailSubject").value;
+    const body = document.getElementById("emailBody").value;
+
+    if (!to || !subject || !body) {
+      alert("Please fill in all fields.");
+      return;
+    }
+
+    const message =
+      `To: ${to}\r\n` +
+      `Subject: ${subject}\r\n` +
+      `Content-Type: text/plain; charset="UTF-8"\r\n` +
+      `\r\n${body}`;
+
+    const encodedMessage = btoa(message)
+      .replace(/\+/g, '-')
+      .replace(/\//g, '_')
+      .replace(/=+$/, '');
+
+    fetch('https://gmail.googleapis.com/gmail/v1/users/me/messages/send', {
       method: 'POST',
       headers: {
         'Authorization': `Bearer ${access_token}`,
         'Content-Type': 'application/json'
       },
-      body: JSON.stringify({
-        addLabelIds: [labelId],
-        removeLabelIds: ['INBOX']
-      })
+      body: JSON.stringify({ raw: encodedMessage })
     })
-    .then(() => {
-      alert("Thread moved to folder.");
-      refreshInbox(currentLabelId);
+    .then(res => {
+      if (res.ok) {
+        alert("Email sent!");
+        document.getElementById("toEmail").value = '';
+        document.getElementById("emailSubject").value = '';
+        document.getElementById("emailBody").value = '';
+      } else {
+        alert("Failed to send email.");
+      }
+    })
+    .catch(err => {
+      console.error(err);
+      alert("Error sending email.");
     });
   }
-
-  window.onscroll = function () {
-    if ((window.innerHeight + window.scrollY) >= document.body.offsetHeight - 50) {
-      loadInbox(currentLabelId);
-    }
-    document.getElementById('backToTop').style.display = window.scrollY > 300 ? 'block' : 'none';
-  };
 </script>
-</body>
-</html>
