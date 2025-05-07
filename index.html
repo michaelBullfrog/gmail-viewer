@@ -2,19 +2,7 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <meta http-equiv="Cross-Origin-Opener-Policy" content="same-origin-allow-popups">
-  <title>Gmail Viewer – Attachments Enabled</title>
-  <script>
-    // Google Sign-In callback must be defined before loading the library
-    function handleCredentialResponse(response) {
-      const decoded = JSON.parse(atob(response.credential.split('.')[1]));
-      document.body.insertAdjacentHTML(
-        'afterbegin',
-        `<p style="text-align:center;">Welcome, ${decoded.name}</p>`
-      );
-      tokenClient.requestAccessToken();
-    }
-  </script>
+  <title>Gmail Viewer – Floating Compose</title>
   <script src="https://accounts.google.com/gsi/client" async defer></script>
   <style>
     body { font-family: Arial, sans-serif; margin: 40px; background-color: #f4f7fa; color: #333; }
@@ -28,31 +16,40 @@
       background: #fff; margin-bottom: 20px; padding: 20px;
       border-radius: 10px; box-shadow: 0 2px 6px rgba(0,0,0,0.1);
     }
-    .subject { font-weight: 700; font-size: 1.1em; color: #004d99; cursor: pointer; }
+    .subject {
+      font-weight: 700; font-size: 1.1em; color: #004d99; cursor: pointer;
+    }
     .subject.read { font-weight: normal; }
     .meta { font-size: 0.9em; color: #777; margin-bottom: 10px; }
-    .email-body { margin-top: 10px; background: #f2f2f2; padding: 10px; border-radius: 5px; white-space: pre-wrap; }
-    .thread-body { margin-top: 15px; padding-left: 15px; border-left: 3px solid #ccc; }
+    .email-body {
+      margin-top: 10px; background: #f2f2f2;
+      padding: 10px; border-radius: 5px; white-space: pre-wrap;
+    }
+    .thread-body {
+      margin-top: 15px; padding-left: 15px; border-left: 3px solid #ccc;
+    }
     .thread-container { display: none; }
     #backToTop {
       position: fixed; bottom: 20px; right: 20px; display: none;
       background-color: #0073e6; color: white; border: none;
       padding: 10px 20px; border-radius: 5px; cursor: pointer;
     }
-    .new-badge { color: red; font-size: 0.9em; font-weight: bold; margin-left: 10px; }
+    .new-badge {
+      color: red; font-size: 0.9em; font-weight: bold; margin-left: 10px;
+    }
   </style>
 </head>
 <body>
   <h1>My Gmail Inbox</h1>
 
+  <!-- Google Sign-In -->
   <div id="g_id_onload"
        data-client_id="474892923870-2r0ksjol93ve88881n7p2glmv7onpd4l.apps.googleusercontent.com"
        data-context="use"
        data-ux_mode="popup"
        data-callback="handleCredentialResponse"
        data-auto_prompt="false"
-       data-scope="https://www.googleapis.com/auth/gmail.modify">
-  </div>
+       data-scope="https://www.googleapis.com/auth/gmail.modify"></div>
 
   <div class="g_id_signin"
        data-type="standard"
@@ -60,8 +57,7 @@
        data-theme="outline"
        data-text="signin_with"
        data-size="large"
-       data-logo_alignment="left">
-  </div>
+       data-logo_alignment="left"></div>
 
   <!-- Filters & Folder UI -->
   <div id="filterSection">
@@ -95,15 +91,11 @@
   </div>
 
   <!-- Folder Title -->
-  <h2 id="currentFolderName"
-      style="text-align:center; color:#0073e6; margin-bottom:20px;"
-      data-folder-name="Inbox">Inbox</h2>
+  <h2 id="currentFolderName" style="text-align:center; color:#0073e6; margin-bottom:20px;" data-folder-name="Inbox">Inbox</h2>
 
   <!-- Emails -->
   <ul id="emails"></ul>
-  <button id="backToTop" onclick="window.scrollTo({top: 0, behavior: 'smooth'})">
-    Back to Top
-  </button>
+  <button id="backToTop" onclick="window.scrollTo({top: 0, behavior: 'smooth'})">Back to Top</button>
 
   <!-- Floating Compose Panel -->
   <div id="composeBox" style="
@@ -120,32 +112,23 @@
   ">
     <div style="display:flex;justify-content:space-between;align-items:center;">
       <h3 style="margin:0;">Compose</h3>
-      <button onclick="toggleCompose(event)"
-              style="background:none;border:none;font-size:16px;cursor:pointer;">
-        ➖
-      </button>
+      <button onclick="toggleCompose()" style="background:none;border:none;font-size:16px;cursor:pointer;">➖</button>
     </div>
     <div id="composeForm">
       <input id="toEmail" type="email" placeholder="To" style="width:100%;padding:8px;margin:8px 0;" />
       <input id="emailSubject" type="text" placeholder="Subject" style="width:100%;padding:8px;margin:8px 0;" />
       <textarea id="emailBody" placeholder="Message..." style="width:100%;padding:8px;height:100px;"></textarea>
-      <label for="attachmentInput">Attachments:</label>
-      <input type="file" id="attachmentInput" multiple style="width:100%;margin:8px 0;" />
-      <button onclick="sendEmail()"
-              style="margin-top:10px;padding:8px 16px;background:#0073e6;color:white;border:none;border-radius:5px;cursor:pointer;">
-        Send
-      </button>
+      <button onclick="sendEmail()" style="margin-top:10px;padding:8px 16px;background:#0073e6;color:white;border:none;border-radius:5px;cursor:pointer;">Send</button>
     </div>
   </div>
 
-  <!-- Floating “new compose” button -->
+  <!-- Floating New Email Button -->
   <button id="composeToggleBtn" onclick="showCompose()"
-          style="position:fixed;bottom:30px;right:30px;background:#0073e6;color:white;border:none;
-                 border-radius:50%;width:50px;height:50px;font-size:24px;cursor:pointer;
-                 box-shadow:0 2px 6px rgba(0,0,0,0.2);display:none;z-index:9999;">
+    style="position:fixed;bottom:30px;right:30px;background:#0073e6;color:white;border:none;
+           border-radius:50%;width:50px;height:50px;font-size:24px;cursor:pointer;
+           box-shadow:0 2px 6px rgba(0,0,0,0.2);display:none;z-index:9999;">
     +
   </button>
-
 <script>
   let access_token = '';
   let tokenClient;
@@ -154,168 +137,410 @@
   let loading = false;
   let currentLabelId = 'INBOX';
 
+  function formatDate(date) {
+    return date.toLocaleString();
+  }
+
   function initializeTokenClient() {
     tokenClient = google.accounts.oauth2.initTokenClient({
       client_id: '474892923870-2r0ksjol93ve88881n7p2glmv7onpd4l.apps.googleusercontent.com',
       scope: 'https://www.googleapis.com/auth/gmail.modify',
-      callback: (resp) => {
-        access_token = resp.access_token;
+      callback: (response) => {
+        access_token = response.access_token;
         loadLabels();
         refreshInbox(currentLabelId);
         setInterval(() => refreshInbox(currentLabelId), 120000);
-      }
+      },
     });
   }
 
-  window.onload = () => {
-    if (window.google && google.accounts) initializeTokenClient();
-    else setTimeout(() => {
-      if (window.google && google.accounts) initializeTokenClient();
-    }, 1000);
+  function handleCredentialResponse(response) {
+    const decoded = JSON.parse(atob(response.credential.split('.')[1]));
+    document.body.insertAdjacentHTML('afterbegin', <p style='text-align:center;'>Welcome, ${decoded.name}</p>);
+    tokenClient?.requestAccessToken();
+  }
+
+  window.onload = function () {
+    if (window.google && google.accounts) {
+      initializeTokenClient();
+    } else {
+      setTimeout(() => {
+        if (window.google && google.accounts) {
+          initializeTokenClient();
+        }
+      }, 1000);
+    }
 
     // Restore compose state
-    const saved = localStorage.getItem('composeCollapsed');
+    const savedState = localStorage.getItem('composeCollapsed');
     const form = document.getElementById('composeForm');
-    const floatBtn = document.getElementById('composeToggleBtn');
-    if (saved === 'true') {
-      form.style.display = 'none';
-      floatBtn.style.display = 'block';
+    const toggleBtn = document.querySelector('#composeBox button');
+    const floatingBtn = document.getElementById('composeToggleBtn');
+
+    if (savedState === 'true') {
+      if (form && toggleBtn) {
+        form.style.display = 'none';
+        toggleBtn.textContent = '➕';
+        floatingBtn.style.display = 'block';
+      }
     }
   };
 
-  function toggleCompose(e) {
+  function toggleCompose() {
     const form = document.getElementById('composeForm');
-    const btn = e.currentTarget;
-    const hidden = form.style.display === 'none';
-    form.style.display = hidden ? 'block' : 'none';
-    btn.textContent = hidden ? '➖' : '➕';
-    document.getElementById('composeToggleBtn').style.display = hidden ? 'none' : 'block';
-    localStorage.setItem('composeCollapsed', hidden ? 'false' : 'true');
+    const toggleBtn = event.target;
+    const isCollapsed = form.style.display === 'none';
+    form.style.display = isCollapsed ? 'block' : 'none';
+    toggleBtn.textContent = isCollapsed ? '➖' : '➕';
+    document.getElementById('composeToggleBtn').style.display = isCollapsed ? 'none' : 'block';
+    localStorage.setItem('composeCollapsed', isCollapsed ? 'false' : 'true');
   }
 
   function showCompose() {
-    document.getElementById('composeForm').style.display = 'block';
-    document.querySelector('#composeBox button').textContent = '➖';
+    const form = document.getElementById('composeForm');
+    const toggleBtn = document.querySelector('#composeBox button');
+    form.style.display = 'block';
+    toggleBtn.textContent = '➖';
     document.getElementById('composeToggleBtn').style.display = 'none';
     localStorage.setItem('composeCollapsed', 'false');
   }
 
   function sendEmail() {
-    const to = document.getElementById('toEmail').value.trim();
-    const subject = document.getElementById('emailSubject').value.trim();
-    const body = document.getElementById('emailBody').value;
-    const files = document.getElementById('attachmentInput').files;
+    const to = document.getElementById("toEmail").value;
+    const subject = document.getElementById("emailSubject").value;
+    const body = document.getElementById("emailBody").value;
 
-    if (!to || !subject) {
-      alert('Please fill in To and Subject.');
+    if (!to || !subject || !body) {
+      alert("Please fill in all fields.");
       return;
     }
 
-    // If there are attachments, build a multipart/mixed message
-    if (files.length > 0) {
-      const boundary = '===boundary_' + Date.now() + '===';
-      // Text part
-      const textPart = [
-        `--${boundary}`,
-        'Content-Type: text/plain; charset=UTF-8',
-        'Content-Transfer-Encoding: 7bit',
-        '',
-        body || ''
-      ].join('\r\n');
+    const message =
+      To: ${to}\r\n +
+      Subject: ${subject}\r\n +
+      Content-Type: text/plain; charset="UTF-8"\r\n +
+      \r\n${body};
 
-      // Read each file as base64
-      const promises = Array.from(files).map(file => new Promise((resolve, reject) => {
-        const reader = new FileReader();
-        reader.onload = () => {
-          const base64Data = reader.result.split(',')[1];
-          const attachmentPart = [
-            `--${boundary}`,
-            `Content-Type: ${file.type || 'application/octet-stream'}; name="${file.name}"`,
-            `Content-Disposition: attachment; filename="${file.name}"`,
-            'Content-Transfer-Encoding: base64',
-            '',
-            base64Data
-          ].join('\r\n');
-          resolve(attachmentPart);
-        };
-        reader.onerror = () => reject(reader.error);
-        reader.readAsDataURL(file);
-      }));
+    const encodedMessage = btoa(message)
+      .replace(/\+/g, '-')
+      .replace(/\//g, '_')
+      .replace(/=+$/, '');
 
-      Promise.all(promises)
-        .then(parts => {
-          const allParts = [textPart].concat(parts).concat([`--${boundary}--`]);
-          const rawMessage = [
-            `To: ${to}`,
-            `Subject: ${subject}`,
-            'MIME-Version: 1.0',
-            `Content-Type: multipart/mixed; boundary="${boundary}"`,
-            '',
-            allParts.join('\r\n')
-          ].join('\r\n');
+    fetch('https://gmail.googleapis.com/gmail/v1/users/me/messages/send', {
+      method: 'POST',
+      headers: {
+        'Authorization': Bearer ${access_token},
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({ raw: encodedMessage })
+    })
+    .then(res => {
+      if (res.ok) {
+        alert("Email sent!");
+        document.getElementById("toEmail").value = '';
+        document.getElementById("emailSubject").value = '';
+        document.getElementById("emailBody").value = '';
+      } else {
+        alert("Failed to send email.");
+      }
+    })
+    .catch(err => {
+      console.error(err);
+      alert("Error sending email.");
+    });
+  }
 
-          const encoded = btoa(rawMessage)
-            .replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+  function createFolder() {
+    const folderName = document.getElementById('newFolderInput').value.trim();
+    if (!folderName) {
+      alert("Please enter a folder name.");
+      return;
+    }
 
-          return fetch('https://gmail.googleapis.com/gmail/v1/users/me/messages/send', {
-            method: 'POST',
-            headers: {
-              'Authorization': `Bearer ${access_token}`,
-              'Content-Type': 'application/json'
-            },
-            body: JSON.stringify({ raw: encoded })
+    fetch('https://gmail.googleapis.com/gmail/v1/users/me/labels', {
+      method: 'POST',
+      headers: {
+        'Authorization': Bearer ${access_token},
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({
+        name: folderName,
+        labelListVisibility: 'labelShow',
+        messageListVisibility: 'show'
+      })
+    })
+    .then(response => response.json())
+    .then(data => {
+      if (data.id) {
+        alert(Folder "${folderName}" created successfully!);
+        loadLabels();
+      } else {
+        alert("Failed to create folder.");
+      }
+    })
+    .catch(err => {
+      console.error(err);
+      alert("Error creating folder.");
+    });
+  }
+
+  function loadLabels() {
+    fetch('https://gmail.googleapis.com/gmail/v1/users/me/labels', {
+      headers: { 'Authorization': Bearer ${access_token} }
+    })
+    .then(res => res.json())
+    .then(data => {
+      labelList = data.labels.filter(l => l.type === 'user');
+      renderFolderDropTargets();
+    });
+  }
+
+  function renderFolderDropTargets() {
+    const container = document.getElementById("folderList");
+    container.innerHTML = '';
+
+    const inboxBtn = document.createElement('div');
+    inboxBtn.textContent = 'Inbox';
+    inboxBtn.style.cssText = 
+      padding: 10px 15px;
+      background: #0073e6;
+      color: white;
+      border-radius: 6px;
+      cursor: pointer;
+      margin-bottom: 10px;
+    ;
+    inboxBtn.onclick = () => {
+      document.getElementById('labelFilter').value = 'INBOX';
+      currentLabelId = 'INBOX';
+      setActiveFolder(inboxBtn);
+      refreshInbox(currentLabelId);
+    };
+    container.appendChild(inboxBtn);
+
+    labelList.forEach(label => {
+      const folder = document.createElement('div');
+      folder.textContent = label.name;
+      folder.setAttribute('data-label-id', label.id);
+      folder.style.cssText = 
+        padding: 10px 15px;
+        background: #0073e6;
+        color: white;
+        border-radius: 6px;
+        cursor: pointer;
+      ;
+
+      folder.ondragover = e => e.preventDefault();
+      folder.ondrop = e => {
+        const threadId = e.dataTransfer.getData("thread-id");
+        moveThreadToFolder(threadId, label.id);
+      };
+
+      folder.onclick = () => {
+        currentLabelId = label.id;
+        document.getElementById('labelFilter').value = '';
+        setActiveFolder(folder);
+        refreshInbox(currentLabelId);
+      };
+
+      container.appendChild(folder);
+    });
+  }
+
+  function setActiveFolder(selectedDiv) {
+    const allFolders = document.querySelectorAll('#folderList > div');
+    allFolders.forEach(f => f.style.outline = 'none');
+
+    selectedDiv.style.outline = '3px solid #fff';
+    selectedDiv.style.boxShadow = '0 0 0 3px #0073e6';
+
+    const folderTitle = selectedDiv.textContent.trim();
+    document.getElementById('currentFolderName').setAttribute('data-folder-name', folderTitle);
+  }
+
+  function moveThreadToFolder(threadId, labelId) {
+    fetch(https://gmail.googleapis.com/gmail/v1/users/me/threads/${threadId}/modify, {
+      method: 'POST',
+      headers: {
+        'Authorization': Bearer ${access_token},
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({
+        addLabelIds: [labelId],
+        removeLabelIds: ['INBOX']
+      })
+    })
+    .then(() => {
+      alert("Thread moved to folder.");
+      refreshInbox(currentLabelId);
+    });
+  }
+</script>
+<script>
+  function getTimeQuery() {
+    const timeFilter = document.getElementById('timeFilter').value;
+    const searchTerm = document.getElementById('searchInput').value.trim();
+    const now = new Date();
+    const qParts = [];
+    if (timeFilter === '24h') qParts.push('after:' + Math.floor((now.getTime() - 86400000) / 1000));
+    if (timeFilter === '7d') qParts.push('after:' + Math.floor((now.getTime() - 604800000) / 1000));
+    if (searchTerm) qParts.push(searchTerm);
+    return qParts.join(' ');
+  }
+
+  function refreshInbox(labelIdOverride = null) {
+    currentLabelId = labelIdOverride || currentLabelId;
+    nextPageToken = '';
+    document.getElementById('emails').innerHTML = '';
+    loadInbox(currentLabelId);
+  }
+
+  function loadInbox(labelIdOverride = null) {
+    if (loading) return;
+    loading = true;
+
+    const query = getTimeQuery();
+    const url = new URL('https://gmail.googleapis.com/gmail/v1/users/me/threads');
+    url.searchParams.set('maxResults', '10');
+    if (query) url.searchParams.set('q', query);
+    if (nextPageToken) url.searchParams.set('pageToken', nextPageToken);
+    if (labelIdOverride && labelIdOverride !== 'all') {
+      url.searchParams.set('labelIds', labelIdOverride);
+    }
+
+    fetch(url, { headers: { 'Authorization': Bearer ${access_token} } })
+      .then(res => res.json())
+      .then(data => {
+        loading = false;
+        if (!data.threads) return;
+        nextPageToken = data.nextPageToken || '';
+        const list = document.getElementById('emails');
+
+        Promise.all(
+          data.threads.map(t =>
+            fetch(https://gmail.googleapis.com/gmail/v1/users/me/threads/${t.id}, {
+              headers: { 'Authorization': Bearer ${access_token} }
+            }).then(res => res.json())
+          )
+        ).then(fullThreads => {
+          const sorted = fullThreads.sort((a, b) => {
+            const bDate = parseInt(b.messages[b.messages.length - 1].internalDate);
+            const aDate = parseInt(a.messages[a.messages.length - 1].internalDate);
+            return bDate - aDate;
           });
-        })
-        .then(res => {
-          if (res.ok) {
-            alert('Email sent with attachments!');
-            document.getElementById('toEmail').value = '';
-            document.getElementById('emailSubject').value = '';
-            document.getElementById('emailBody').value = '';
-            document.getElementById('attachmentInput').value = '';
-          } else {
-            alert('Failed to send email with attachments.');
-          }
-        })
-        .catch(err => {
-          console.error(err);
-          alert('Error sending email: ' + err.message);
+
+          sorted.forEach(fullThread => {
+            const item = document.createElement('li');
+            item.setAttribute('data-thread-id', fullThread.id);
+            item.setAttribute('draggable', true);
+            item.ondragstart = e => e.dataTransfer.setData("thread-id", fullThread.id);
+
+            const messages = fullThread.messages.sort((a, b) => parseInt(b.internalDate) - parseInt(a.internalDate));
+            const newestMsg = messages[0];
+            const subject = newestMsg.payload.headers.find(h => h.name === 'Subject')?.value || '(No Subject)';
+            const newestDate = formatDate(new Date(parseInt(newestMsg.internalDate)));
+            const first = messages[0];
+            const isUnread = first.labelIds?.includes("UNREAD");
+            const newBadge = isUnread ? <span class="new-badge">NEW</span> : '';
+
+            let threadHtml = '';
+            messages.forEach(m => {
+              const from = m.payload.headers.find(h => h.name === 'From')?.value || '(Unknown)';
+              const date = formatDate(new Date(parseInt(m.internalDate)));
+              const part = m.payload.parts?.find(p => p.mimeType === 'text/plain') || m.payload;
+              const body = part.body.data ? atob(part.body.data.replace(/-/g, '+').replace(/_/g, '/')) : '(No body)';
+              threadHtml += 
+                <div class="thread-body">
+                  <div class="meta">From: ${from}<br>Date: ${date}</div>
+                  <div class="email-body">${body}</div>
+                </div>;
+            });
+
+            const labelDropdown = labelList.map(label =>
+              <option value="${label.id}">${label.name}</option>).join('');
+
+            item.innerHTML = 
+              <div class="subject${isUnread ? '' : ' read'}" onclick="toggleThread(this)">
+                ${subject}${newBadge}
+                <span style="float:right; font-size:0.85em; color:#666;">${newestDate}</span>
+              </div>
+
+              <div style="margin-top: 10px;">
+                <label>Move to Folder:</label>
+                <select onchange="labelThread(this, '${fullThread.id}')">
+                  <option value="">Select folder</option>
+                  ${labelDropdown}
+                </select>
+              </div>
+
+              <div class="thread-container">
+                ${threadHtml}
+              </div>;
+            list.appendChild(item);
+          });
+
+          const headingEl = document.getElementById('currentFolderName');
+          const baseName = headingEl.getAttribute('data-folder-name') || 'Inbox';
+          const unreadCount = fullThreads.reduce((sum, thread) => {
+            const newest = thread.messages[0];
+            return sum + (newest.labelIds?.includes('UNREAD') ? 1 : 0);
+          }, 0);
+
+          headingEl.textContent = ${baseName} (${fullThreads.length} messages${unreadCount > 0 ? , ${unreadCount} unread : ''});
         });
+      });
+  }
 
-    } else {
-      // No attachments: simple single-part send
-      const msg = `To: ${to}\r\nSubject: ${subject}\r\nContent-Type: text/plain; charset="UTF-8"\r\n\r\n${body}`;
-      const encoded = btoa(msg)
-        .replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+  function toggleThread(subjectDiv) {
+    const container = subjectDiv.nextElementSibling?.nextElementSibling;
+    const isHidden = container?.style.display === 'none';
+    if (container) {
+      container.style.display = isHidden ? 'block' : 'none';
+    }
 
-      fetch('https://gmail.googleapis.com/gmail/v1/users/me/messages/send', {
+    subjectDiv.classList.add('read');
+    const badge = subjectDiv.querySelector('.new-badge');
+    if (badge) badge.remove();
+
+    const threadId = subjectDiv.closest('li')?.dataset.threadId;
+    if (threadId) {
+      fetch(https://gmail.googleapis.com/gmail/v1/users/me/threads/${threadId}/modify, {
         method: 'POST',
         headers: {
-          'Authorization': `Bearer ${access_token}`,
+          'Authorization': Bearer ${access_token},
           'Content-Type': 'application/json'
         },
-        body: JSON.stringify({ raw: encoded })
-      })
-      .then(res => {
-        if (res.ok) {
-          alert('Email sent!');
-          document.getElementById('toEmail').value = '';
-          document.getElementById('emailSubject').value = '';
-          document.getElementById('emailBody').value = '';
-        } else {
-          alert('Failed to send email.');
-        }
-      })
-      .catch(err => {
-        console.error(err);
-        alert('Error sending email.');
+        body: JSON.stringify({ removeLabelIds: ['UNREAD'] })
       });
     }
   }
 
-  // —— (the rest of your loadLabels(), renderFolderDropTargets(), refreshInbox(), loadInbox(),
-  //      toggleThread(), labelThread(), and onscroll logic remains unchanged) ——
+  function labelThread(selectElem, threadId) {
+    const labelId = selectElem.value;
+    if (!labelId) return;
+
+    fetch(https://gmail.googleapis.com/gmail/v1/users/me/threads/${threadId}/modify, {
+      method: 'POST',
+      headers: {
+        'Authorization': Bearer ${access_token},
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({
+        addLabelIds: [labelId],
+        removeLabelIds: ['INBOX']
+      })
+    })
+    .then(() => {
+      alert("Thread moved to folder.");
+      refreshInbox(currentLabelId);
+    });
+  }
+
+  window.onscroll = function () {
+    if ((window.innerHeight + window.scrollY) >= document.body.offsetHeight - 50) {
+      loadInbox(currentLabelId);
+    }
+    document.getElementById('backToTop').style.display = window.scrollY > 300 ? 'block' : 'none';
+  };
 </script>
 </body>
 </html>
-
