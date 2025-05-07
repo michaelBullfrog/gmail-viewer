@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <title>Gmail Viewer – With Inbox Button</title>
+  <title>Gmail Viewer – Fixed Labels</title>
   <script src="https://accounts.google.com/gsi/client" async defer></script>
   <style>
     body { font-family: Arial, sans-serif; margin: 40px; background-color: #f4f7fa; color: #333; }
@@ -75,23 +75,23 @@
   <!-- Filters -->
   <div id="filterSection">
     <label for="timeFilter">Time:</label>
-    <select id="timeFilter" onchange="refreshInbox()">
+    <select id="timeFilter" onchange="refreshInbox(currentLabelId)">
       <option value="24h">Last 24 Hours</option>
       <option value="7d">Last 7 Days</option>
       <option value="all" selected>All</option>
     </select>
 
     <label for="labelFilter">Label:</label>
-    <select id="labelFilter" onchange="refreshInbox()">
-      <option value="label:INBOX">Inbox</option>
-      <option value="label:SENT">Sent Mail</option>
-      <option value="label:DRAFT">Drafts</option>
-      <option value="label:SPAM">Junk / Spam</option>
-      <option value="label:TRASH">Deleted Items</option>
+    <select id="labelFilter" onchange="refreshInbox(this.value)">
+      <option value="INBOX">Inbox</option>
+      <option value="SENT">Sent Mail</option>
+      <option value="DRAFT">Drafts</option>
+      <option value="SPAM">Junk / Spam</option>
+      <option value="TRASH">Deleted Items</option>
     </select>
 
     <input type="text" id="searchInput" placeholder="Search keywords...">
-    <button id="searchButton" onclick="refreshInbox()">Search</button>
+    <button id="searchButton" onclick="refreshInbox(currentLabelId)">Search</button>
 
     <br><br>
     <input type="text" id="newFolderInput" placeholder="New folder name..." />
@@ -111,7 +111,7 @@
   let labelList = [];
   let nextPageToken = '';
   let loading = false;
-  let currentLabelId = null;
+  let currentLabelId = 'INBOX';
 
   function formatDate(date) {
     return date.toLocaleString();
@@ -124,7 +124,7 @@
       callback: (response) => {
         access_token = response.access_token;
         loadLabels();
-        refreshInbox();
+        refreshInbox(currentLabelId);
         setInterval(() => refreshInbox(currentLabelId), 120000);
       },
     });
@@ -197,7 +197,7 @@
     const container = document.getElementById("folderList");
     container.innerHTML = '';
 
-    // Inbox button
+    // Back to Inbox button
     const inboxBtn = document.createElement('div');
     inboxBtn.textContent = 'Inbox';
     inboxBtn.style.cssText = `
@@ -209,9 +209,9 @@
       margin-bottom: 10px;
     `;
     inboxBtn.onclick = () => {
-      document.getElementById('labelFilter').value = 'label:INBOX';
-      currentLabelId = null;
-      refreshInbox();
+      document.getElementById('labelFilter').value = 'INBOX';
+      currentLabelId = 'INBOX';
+      refreshInbox(currentLabelId);
     };
     container.appendChild(inboxBtn);
 
@@ -236,6 +236,7 @@
 
       folder.onclick = () => {
         currentLabelId = label.id;
+        document.getElementById('labelFilter').value = '';
         refreshInbox(currentLabelId);
       };
 
@@ -256,7 +257,7 @@
       })
     })
     .then(() => {
-      alert("Thread moved via drag-and-drop.");
+      alert("Thread moved to folder.");
       refreshInbox(currentLabelId);
     });
   }
