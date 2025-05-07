@@ -156,7 +156,7 @@
 
   function handleCredentialResponse(response) {
     const decoded = JSON.parse(atob(response.credential.split('.')[1]));
-    document.body.insertAdjacentHTML('afterbegin', `<p style='text-align:center;'>Welcome, ${decoded.name}</p>`);
+    document.body.insertAdjacentHTML('afterbegin', <p style='text-align:center;'>Welcome, ${decoded.name}</p>);
     tokenClient?.requestAccessToken();
   }
 
@@ -216,10 +216,10 @@
     }
 
     const message =
-      `To: ${to}\r\n` +
-      `Subject: ${subject}\r\n` +
-      `Content-Type: text/plain; charset="UTF-8"\r\n` +
-      `\r\n${body}`;
+      To: ${to}\r\n +
+      Subject: ${subject}\r\n +
+      Content-Type: text/plain; charset="UTF-8"\r\n +
+      \r\n${body};
 
     const encodedMessage = btoa(message)
       .replace(/\+/g, '-')
@@ -229,7 +229,7 @@
     fetch('https://gmail.googleapis.com/gmail/v1/users/me/messages/send', {
       method: 'POST',
       headers: {
-        'Authorization': `Bearer ${access_token}`,
+        'Authorization': Bearer ${access_token},
         'Content-Type': 'application/json'
       },
       body: JSON.stringify({ raw: encodedMessage })
@@ -260,7 +260,7 @@
     fetch('https://gmail.googleapis.com/gmail/v1/users/me/labels', {
       method: 'POST',
       headers: {
-        'Authorization': `Bearer ${access_token}`,
+        'Authorization': Bearer ${access_token},
         'Content-Type': 'application/json'
       },
       body: JSON.stringify({
@@ -272,7 +272,7 @@
     .then(response => response.json())
     .then(data => {
       if (data.id) {
-        alert(`Folder "${folderName}" created successfully!`);
+        alert(Folder "${folderName}" created successfully!);
         loadLabels();
       } else {
         alert("Failed to create folder.");
@@ -286,7 +286,7 @@
 
   function loadLabels() {
     fetch('https://gmail.googleapis.com/gmail/v1/users/me/labels', {
-      headers: { 'Authorization': `Bearer ${access_token}` }
+      headers: { 'Authorization': Bearer ${access_token} }
     })
     .then(res => res.json())
     .then(data => {
@@ -301,14 +301,14 @@
 
     const inboxBtn = document.createElement('div');
     inboxBtn.textContent = 'Inbox';
-    inboxBtn.style.cssText = `
+    inboxBtn.style.cssText = 
       padding: 10px 15px;
       background: #0073e6;
       color: white;
       border-radius: 6px;
       cursor: pointer;
       margin-bottom: 10px;
-    `;
+    ;
     inboxBtn.onclick = () => {
       document.getElementById('labelFilter').value = 'INBOX';
       currentLabelId = 'INBOX';
@@ -321,13 +321,13 @@
       const folder = document.createElement('div');
       folder.textContent = label.name;
       folder.setAttribute('data-label-id', label.id);
-      folder.style.cssText = `
+      folder.style.cssText = 
         padding: 10px 15px;
         background: #0073e6;
         color: white;
         border-radius: 6px;
         cursor: pointer;
-      `;
+      ;
 
       folder.ondragover = e => e.preventDefault();
       folder.ondrop = e => {
@@ -358,10 +358,10 @@
   }
 
   function moveThreadToFolder(threadId, labelId) {
-    fetch(`https://gmail.googleapis.com/gmail/v1/users/me/threads/${threadId}/modify`, {
+    fetch(https://gmail.googleapis.com/gmail/v1/users/me/threads/${threadId}/modify, {
       method: 'POST',
       headers: {
-        'Authorization': `Bearer ${access_token}`,
+        'Authorization': Bearer ${access_token},
         'Content-Type': 'application/json'
       },
       body: JSON.stringify({
@@ -407,7 +407,7 @@
       url.searchParams.set('labelIds', labelIdOverride);
     }
 
-    fetch(url, { headers: { 'Authorization': `Bearer ${access_token}` } })
+    fetch(url, { headers: { 'Authorization': Bearer ${access_token} } })
       .then(res => res.json())
       .then(data => {
         loading = false;
@@ -417,8 +417,8 @@
 
         Promise.all(
           data.threads.map(t =>
-            fetch(`https://gmail.googleapis.com/gmail/v1/users/me/threads/${t.id}`, {
-              headers: { 'Authorization': `Bearer ${access_token}` }
+            fetch(https://gmail.googleapis.com/gmail/v1/users/me/threads/${t.id}, {
+              headers: { 'Authorization': Bearer ${access_token} }
             }).then(res => res.json())
           )
         ).then(fullThreads => {
@@ -440,7 +440,7 @@
             const newestDate = formatDate(new Date(parseInt(newestMsg.internalDate)));
             const first = messages[0];
             const isUnread = first.labelIds?.includes("UNREAD");
-            const newBadge = isUnread ? `<span class="new-badge">NEW</span>` : '';
+            const newBadge = isUnread ? <span class="new-badge">NEW</span> : '';
 
             let threadHtml = '';
             messages.forEach(m => {
@@ -448,17 +448,17 @@
               const date = formatDate(new Date(parseInt(m.internalDate)));
               const part = m.payload.parts?.find(p => p.mimeType === 'text/plain') || m.payload;
               const body = part.body.data ? atob(part.body.data.replace(/-/g, '+').replace(/_/g, '/')) : '(No body)';
-              threadHtml += `
+              threadHtml += 
                 <div class="thread-body">
                   <div class="meta">From: ${from}<br>Date: ${date}</div>
                   <div class="email-body">${body}</div>
-                </div>`;
+                </div>;
             });
 
             const labelDropdown = labelList.map(label =>
-              `<option value="${label.id}">${label.name}</option>`).join('');
+              <option value="${label.id}">${label.name}</option>).join('');
 
-            item.innerHTML = `
+            item.innerHTML = 
               <div class="subject${isUnread ? '' : ' read'}" onclick="toggleThread(this)">
                 ${subject}${newBadge}
                 <span style="float:right; font-size:0.85em; color:#666;">${newestDate}</span>
@@ -474,7 +474,7 @@
 
               <div class="thread-container">
                 ${threadHtml}
-              </div>`;
+              </div>;
             list.appendChild(item);
           });
 
@@ -485,7 +485,7 @@
             return sum + (newest.labelIds?.includes('UNREAD') ? 1 : 0);
           }, 0);
 
-          headingEl.textContent = `${baseName} (${fullThreads.length} messages${unreadCount > 0 ? `, ${unreadCount} unread` : ''})`;
+          headingEl.textContent = ${baseName} (${fullThreads.length} messages${unreadCount > 0 ? , ${unreadCount} unread : ''});
         });
       });
   }
@@ -503,10 +503,10 @@
 
     const threadId = subjectDiv.closest('li')?.dataset.threadId;
     if (threadId) {
-      fetch(`https://gmail.googleapis.com/gmail/v1/users/me/threads/${threadId}/modify`, {
+      fetch(https://gmail.googleapis.com/gmail/v1/users/me/threads/${threadId}/modify, {
         method: 'POST',
         headers: {
-          'Authorization': `Bearer ${access_token}`,
+          'Authorization': Bearer ${access_token},
           'Content-Type': 'application/json'
         },
         body: JSON.stringify({ removeLabelIds: ['UNREAD'] })
@@ -518,10 +518,10 @@
     const labelId = selectElem.value;
     if (!labelId) return;
 
-    fetch(`https://gmail.googleapis.com/gmail/v1/users/me/threads/${threadId}/modify`, {
+    fetch(https://gmail.googleapis.com/gmail/v1/users/me/threads/${threadId}/modify, {
       method: 'POST',
       headers: {
-        'Authorization': `Bearer ${access_token}`,
+        'Authorization': Bearer ${access_token},
         'Content-Type': 'application/json'
       },
       body: JSON.stringify({
