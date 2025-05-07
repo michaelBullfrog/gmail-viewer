@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <title>Gmail Viewer – Folder Support</title>
+  <title>Gmail Viewer – Drag & Drop Folders</title>
   <script src="https://accounts.google.com/gsi/client" async defer></script>
   <style>
     body { font-family: Arial, sans-serif; margin: 40px; background-color: #f4f7fa; color: #333; }
@@ -31,16 +31,11 @@
     .thread-container {
       display: none;
     }
-    .reply-box {
-      margin-top: 10px;
-    }
     .reply-box input, .reply-box textarea {
       width: 100%; padding: 8px; margin-top: 5px;
       border-radius: 5px; border: 1px solid #ccc; font-size: 0.95em;
     }
-    .reply-box textarea {
-      height: 80px; resize: vertical;
-    }
+    .reply-box textarea { height: 80px; resize: vertical; }
     .reply-box button {
       margin-top: 10px; padding: 8px 16px; border: none;
       border-radius: 5px; background-color: #0073e6; color: white;
@@ -101,6 +96,11 @@
     <br><br>
     <input type="text" id="newFolderInput" placeholder="New folder name..." />
     <button onclick="createFolder()">Create Folder</button>
+
+    <div id="folderDropZone" style="margin-top:20px;">
+      <h3>Your Folders</h3>
+      <div id="folderList" style="display:flex; flex-wrap:wrap; justify-content:center; gap:10px;"></div>
+    </div>
   </div>
 
   <ul id="emails"></ul>
@@ -153,7 +153,8 @@
     })
     .then(res => res.json())
     .then(data => {
-      labelList = data.labels.filter(l => l.type === 'user'); // Only user-created labels
+      labelList = data.labels.filter(l => l.type === 'user');
+      renderFolderDropTargets();
     });
   }
 
@@ -180,7 +181,7 @@
     .then(data => {
       if (data.id) {
         alert(`Folder "${folderName}" created successfully!`);
-        loadLabels(); // refresh label list
+        loadLabels();
       } else {
         alert("Failed to create folder.");
       }
@@ -188,6 +189,47 @@
     .catch(err => {
       console.error(err);
       alert("Error creating folder.");
+    });
+  }
+
+  function renderFolderDropTargets() {
+    const container = document.getElementById("folderList");
+    container.innerHTML = '';
+    labelList.forEach(label => {
+      const folder = document.createElement('div');
+      folder.textContent = label.name;
+      folder.setAttribute('data-label-id', label.id);
+      folder.style.cssText = `
+        padding: 10px 15px;
+        background: #0073e6;
+        color: white;
+        border-radius: 6px;
+        cursor: pointer;
+      `;
+      folder.ondragover = e => e.preventDefault();
+      folder.ondrop = e => {
+        const threadId = e.dataTransfer.getData("thread-id");
+        moveThreadToFolder(threadId, label.id);
+      };
+      container.appendChild(folder);
+    });
+  }
+
+  function moveThreadToFolder(threadId, labelId) {
+    fetch(`https://gmail.googleapis.com/gmail/v1/users/me/threads/${threadId}/modify`, {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${access_token}`,
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({
+        addLabelIds: [labelId],
+        removeLabelIds: ['INBOX']
+      })
+    })
+    .then(() => {
+      alert("Thread moved via drag-and-drop.");
+      refreshInbox();
     });
   }
 
@@ -245,6 +287,8 @@
           sorted.forEach(fullThread => {
             const item = document.createElement('li');
             item.setAttribute('data-thread-id', fullThread.id);
+            item.setAttribute('draggable', true);
+            item.ondragstart = e => e.dataTransfer.setData("thread-id", fullThread.id);
 
             const messages = fullThread.messages.sort((a, b) => parseInt(b.internalDate) - parseInt(a.internalDate));
             const newestMsg = messages[0];
@@ -344,6 +388,10 @@
     }
     document.getElementById('backToTop').style.display = window.scrollY > 300 ? 'block' : 'none';
   };
+</script>
+</body>
+</html>
+
 </script>
 </body>
 </html>
