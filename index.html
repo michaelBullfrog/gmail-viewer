@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <title>Gmail Viewer – Folder Filtering Fix</title>
+  <title>Gmail Viewer – With Inbox Button</title>
   <script src="https://accounts.google.com/gsi/client" async defer></script>
   <style>
     body { font-family: Arial, sans-serif; margin: 40px; background-color: #f4f7fa; color: #333; }
@@ -196,6 +196,26 @@
   function renderFolderDropTargets() {
     const container = document.getElementById("folderList");
     container.innerHTML = '';
+
+    // Inbox button
+    const inboxBtn = document.createElement('div');
+    inboxBtn.textContent = 'Inbox';
+    inboxBtn.style.cssText = `
+      padding: 10px 15px;
+      background: #444;
+      color: white;
+      border-radius: 6px;
+      cursor: pointer;
+      margin-bottom: 10px;
+    `;
+    inboxBtn.onclick = () => {
+      document.getElementById('labelFilter').value = 'label:INBOX';
+      currentLabelId = null;
+      refreshInbox();
+    };
+    container.appendChild(inboxBtn);
+
+    // Custom folders
     labelList.forEach(label => {
       const folder = document.createElement('div');
       folder.textContent = label.name;
