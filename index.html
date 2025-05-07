@@ -29,17 +29,6 @@
       margin-top: 15px; padding-left: 15px; border-left: 3px solid #ccc;
     }
     .thread-container { display: none; }
-    .reply-box input, .reply-box textarea {
-      width: 100%; padding: 8px; margin-top: 5px;
-      border-radius: 5px; border: 1px solid #ccc; font-size: 0.95em;
-    }
-    .reply-box textarea { height: 80px; resize: vertical; }
-    .reply-box button {
-      margin-top: 10px; padding: 10px 20px; border: none;
-      border-radius: 5px; background-color: #0073e6; color: white;
-      cursor: pointer; font-size: 0.95em; font-weight: 600;
-    }
-    .reply-box button:hover { background-color: #005bb5; }
     #backToTop {
       position: fixed; bottom: 20px; right: 20px; display: none;
       background-color: #0073e6; color: white; border: none;
@@ -70,7 +59,7 @@
        data-size="large"
        data-logo_alignment="left"></div>
 
-  <!-- Filters -->
+  <!-- Filters & Folder UI -->
   <div id="filterSection">
     <label for="timeFilter">Time:</label>
     <select id="timeFilter" onchange="refreshInbox(currentLabelId)">
@@ -101,7 +90,10 @@
     </div>
   </div>
 
+  <!-- Folder Name Header -->
   <h2 id="currentFolderName" style="text-align:center; color:#0073e6; margin-bottom:20px;" data-folder-name="Inbox">Inbox</h2>
+
+  <!-- Email List -->
   <ul id="emails"></ul>
   <button id="backToTop" onclick="window.scrollTo({top: 0, behavior: 'smooth'})">Back to Top</button>
 
@@ -263,6 +255,24 @@
     document.getElementById('currentFolderName').setAttribute('data-folder-name', folderTitle);
   }
 
+  function moveThreadToFolder(threadId, labelId) {
+    fetch(`https://gmail.googleapis.com/gmail/v1/users/me/threads/${threadId}/modify`, {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${access_token}`,
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({
+        addLabelIds: [labelId],
+        removeLabelIds: ['INBOX']
+      })
+    })
+    .then(() => {
+      alert("Thread moved to folder.");
+      refreshInbox(currentLabelId);
+    });
+  }
+
   function sendEmail() {
     const to = document.getElementById("toEmail").value;
     const subject = document.getElementById("emailSubject").value;
@@ -309,6 +319,24 @@
   }
 </script>
 <script>
+  function getTimeQuery() {
+    const timeFilter = document.getElementById('timeFilter').value;
+    const searchTerm = document.getElementById('searchInput').value.trim();
+    const now = new Date();
+    const qParts = [];
+    if (timeFilter === '24h') qParts.push('after:' + Math.floor((now.getTime() - 86400000) / 1000));
+    if (timeFilter === '7d') qParts.push('after:' + Math.floor((now.getTime() - 604800000) / 1000));
+    if (searchTerm) qParts.push(searchTerm);
+    return qParts.join(' ');
+  }
+
+  function refreshInbox(labelIdOverride = null) {
+    currentLabelId = labelIdOverride || currentLabelId;
+    nextPageToken = '';
+    document.getElementById('emails').innerHTML = '';
+    loadInbox(currentLabelId);
+  }
+
   function loadInbox(labelIdOverride = null) {
     if (loading) return;
     loading = true;
@@ -318,7 +346,9 @@
     url.searchParams.set('maxResults', '10');
     if (query) url.searchParams.set('q', query);
     if (nextPageToken) url.searchParams.set('pageToken', nextPageToken);
-    if (labelIdOverride) url.searchParams.set('labelIds', labelIdOverride);
+    if (labelIdOverride && labelIdOverride !== 'all') {
+      url.searchParams.set('labelIds', labelIdOverride);
+    }
 
     fetch(url, { headers: { 'Authorization': `Bearer ${access_token}` } })
       .then(res => res.json())
@@ -391,7 +421,7 @@
             list.appendChild(item);
           });
 
-          // Update folder heading with count
+          // Folder count display
           const headingEl = document.getElementById('currentFolderName');
           const baseName = headingEl.getAttribute('data-folder-name') || 'Inbox';
           const unreadCount = fullThreads.reduce((sum, thread) => {
